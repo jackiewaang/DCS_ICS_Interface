@@ -19,14 +19,17 @@ def init_db():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS documents (
             document_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id INTEGER,                                    -- original REF case ID
             title TEXT,
             institution TEXT,
             uoa TEXT,
-            ref_year INTEGER,
-            gpa REAL,
+            ref_year INTEGER,                                   -- 2014, 2021 or NULL for new cases
+            gpa REAL,                                           -- NULL for new cases
+            impact_label INTEGER,                               -- 1 for High, 0 for Low
             raw_text TEXT,
-            features_json TEXT,
-            entities_json TEXT
+            features_json TEXT,                                 -- Readability GTFs + NER counts
+            entities_json TEXT,                                 -- SpaCy NER entity list
+            UNIQUE(case_id, ref_year)                          -- Ensure no duplicates for REF cases
         )
     """)
     print("Created 'documents' table.")
@@ -37,9 +40,12 @@ def init_db():
             name TEXT UNIQUE,
             architecture TEXT,
             checkpoint_path TEXT,
+            scaler_path TEXT,
             embedding_name TEXT,
             input_dim INTEGER,
-            use_features BOOLEAN -- some models (Qwen) do not use features 
+            use_features INTEGER, -- some models (Qwen) do not use features 
+            input_granularity TEXT, -- 'sentence' or 'document'
+            task TEXT -- 'classification' or 'regression'
         )
     """)
     print("Created 'model_configs' table.")
