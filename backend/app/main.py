@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.api.analyse import router as analysis_router
+from app.api.cases import router as cases_router
 from app.database import init_db
 
 # Lifespan handles startup and shutdown logic
@@ -29,7 +30,7 @@ app.add_middleware(
 )
 
 # Include the routers using the new pathing
-# app.include_router(cases.router, prefix="/cases", tags=["Cases"])
+app.include_router(cases_router)
 app.include_router(analysis_router)
 
 @app.get("/")

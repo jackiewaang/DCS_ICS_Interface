@@ -6,6 +6,9 @@ from app.services.inference_service import inference_engine
 from app.database import get_model_config 
 from app.services.utils import get_ref_sections
 from app.crud import create_inference_case
+import sqlite3
+
+DB_PATH = "app/database.db"
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
@@ -82,3 +85,35 @@ async def analyse_document(config_id, file: UploadFile = File(...)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/configs")
+def list_configs():
+    """
+    Fetches all available model configurations for the frontend sidebar.
+    """
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        # This allows us to access columns by name (e.g., row['name'])
+        conn.row_factory = sqlite3.Row 
+        cursor = conn.cursor()
+        
+        # We select the specific columns needed by the React sidebar
+        cursor.execute("""
+            SELECT 
+                config_id, 
+                name, 
+                architecture, 
+                use_features, 
+                input_granularity 
+            FROM model_configs
+        """)
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        # Convert sqlite3.Row objects into standard Python dictionaries
+        return [dict(row) for row in rows]
+        
+    except Exception as e:
+        print(f"DATABASE ERROR: {e}")
+        raise HTTPException(status_code=500, detail="Could not retrieve model configurations.")

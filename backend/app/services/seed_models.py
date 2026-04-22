@@ -16,6 +16,12 @@ def seed_models():
         ),
         (
             "Qwen3-4B-full-text-MIL", "MIL", "assets/models/qwen3-4b-full-text-mil_f2.pt", "", "Qwen3-Embedding-4B", 2560, 0, "full_text", "classification"
+        ),
+        (
+            "Qwen3-4B-sentence-MIL", "MIL", "assets/models/qwen3-4b-sentence-mil_f2.pt", "assets/models/scaler_qwen3-4b-sentence-mil_f2.joblib", "Qwen3-Embedding-4B", 2560, 1, "sentence", "classification"
+        ),
+        (
+            "Mpnet-MIL-Fusion-ALL", "MIL Fusion", "assets/models/mpnet-fusion-sentence-mil_f2.pt", "assets/models/scaler_mpnet-sentence-mil_f2.joblib", "all-mpnet-base-v2", 768, 1, "sentence", "classification"
         )
     ]
 

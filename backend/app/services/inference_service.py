@@ -67,7 +67,14 @@ class ModelManager:
                 case_feat_dim=33 if config['use_features'] else None,
             )
 
-            model.load_state_dict(torch.load(config['checkpoint_path'], map_location=self.device))
+            checkpoint = torch.load(config['checkpoint_path'], map_location=self.device, weights_only=False)
+
+            # 2. Extract ONLY the model weights
+            # Depending on how you saved it, the key is likely 'model_state_dict'
+            state_dict = checkpoint.get('model_state_dict', checkpoint)
+
+            # 3. Load those weights into the model
+            model.load_state_dict(state_dict)
             model.to(self.device).eval()
             self.loaded_models[cfg_id] = model
         
