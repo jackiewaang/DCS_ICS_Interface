@@ -1,5 +1,3 @@
-import { Info } from "lucide-react";
-
 export default function AttentionHeatmap ({ heatmap, hasMLData }) {
     if (!hasMLData || !heatmap || heatmap.length === 0) {
         return (
@@ -22,7 +20,7 @@ export default function AttentionHeatmap ({ heatmap, hasMLData }) {
         </h3>
         <div className="flex items-center gap-3 text-xs font-bold text-slate-400 uppercase">
           <span>Low Interest</span>
-          <div className="w-32 h-1.5 rounded-full bg-gradient-to-r from-slate-100 to-blue-500 border border-slate-200"></div>
+          <div className="w-32 h-1.5 rounded-full bg-gradient-to-r from-slate-100 to-blue-400 border border-slate-200"></div>
           <span className="text-blue-600">High Attention</span>
         </div>
       </div>
@@ -31,10 +29,16 @@ export default function AttentionHeatmap ({ heatmap, hasMLData }) {
       <div className="h-[850px] overflow-y-auto border border-slate-200 rounded-xl bg-white p-8 shadow-inner">
         <div className="font-serif text-lg leading-relaxed text-slate-800 antialiased">
           {heatmap.map((sentence, idx) => {
-            const relativeWeight = maxWeight > 0 ? (sentence.attention_score / maxWeight) : 0;
-            // Opacity scaling using standard rgba
-            const backgroundColor = `rgba(14, 165, 233, ${relativeWeight * 0.4})`;
+            // 1. Calculate linear ratio
+            const linearRatio = maxWeight > 0 ? sentence.attention_score / maxWeight : 0;
+            
+            // 2. APPLY SQUARE ROOT SCALING
+            // This makes small weights (like 0.008) much more visible visually
+            const boostedWeight = Math.sqrt(linearRatio);
 
+            // 3. AMBER COLOR (Highlighter style)
+            // Increased max opacity to 0.6 for better visibility
+            const backgroundColor = `rgba(14, 165, 233, ${boostedWeight * 0.6})`;
             return (
               <span
                 key={idx}
