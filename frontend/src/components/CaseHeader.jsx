@@ -68,7 +68,7 @@ export default function CaseHeader({ data }) {
                     {data.gpa >= 3 ? "High Impact" : "Low Impact"}
                   </span>
                   <span className="text-xs font-bold text-slate-400 italic">
-                    ({data.gpa} GPA)
+                    ({data.gpa.toFixed(2)} GPA)
                   </span>
                 </div>
               ) : (
