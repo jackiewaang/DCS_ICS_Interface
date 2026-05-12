@@ -5,6 +5,16 @@ import os
 
 DB_PATH = "app/database.db"
 
+GTF_ORDER = [
+    "Flesch Reading Ease", "Dale-Chall Readability Score", "SMOG Index", "Automated Readability Index",
+    "Sentiment (mean)", "Sentiment (10th)", "Sentiment (50th)", "Sentiment (75th)", "Sentiment (90th)",
+    "Number of organizations mentioned", "Number of named individuals", "Number of countries or regions mentioned",
+    "Word count", "Paragraph count",
+    'PERSON', 'NORP', 'FAC', 'ORG', 'GPE', 'LOC', 'PRODUCT', 'EVENT',
+    'WORK_OF_ART', 'LAW', 'LANGUAGE', 'DATE', 'TIME', 'PERCENT', 'MONEY',
+    'QUANTITY', 'ORDINAL', 'CARDINAL'
+]
+
 def dict_factory(cursor, row):
     d = {}
     for idx, col in enumerate(cursor.description):
@@ -27,8 +37,9 @@ def get_cases(search_query: str = None, uoa: str = None):
             d.institution, 
             d.uoa, 
             d.gpa, 
-            i.score as model_prediction, 
-            i.label as model_label,
+            i.score as model_prediction,       -- 0-1 probability
+            i.prediction_label as model_label, -- High or Low
+            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
             mc.name as model_name
         FROM inferences i
         JOIN documents d ON i.document_id = d.document_id
@@ -63,8 +74,9 @@ def get_inference_details(inference_id: int):
         SELECT 
             d.*, 
             i.inference_id,
-            i.score, 
-            i.label, 
+            i.score as model_prediction,       -- 0-1 probability
+            i.prediction_label as model_label, -- High or Low
+            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
             mc.name as model_name,
             mc.input_granularity
         FROM inferences i
@@ -122,8 +134,9 @@ def get_case_by_id(document_id: int):
         SELECT 
             d.*, 
             i.inference_id,
-            i.score, 
-            i.label, 
+            i.score as model_prediction,       -- 0-1 probability
+            i.prediction_label as model_label, -- High or Low
+            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
             mc.name as model_name
         FROM documents d
         LEFT JOIN inferences i ON d.document_id = i.document_id
@@ -171,7 +184,6 @@ def create_inference_case(filename, features, sentences, prediction, institution
 
     try:
         # 1. Prepare JSON blobs
-        # We separate the highlights (NER) from the statistical metrics (GTFs)
         entities_blob = json.dumps(features.get("highlights", {}))
         
         # Filter out the non-numeric highlight data for the features_json
@@ -179,7 +191,6 @@ def create_inference_case(filename, features, sentences, prediction, institution
         features_blob = json.dumps(stats_only)
         
         # 2. Insert into 'documents'
-        # case_id, ref_year, gpa, and impact_label are omitted (defaulting to NULL)
         cursor.execute("""
             INSERT INTO documents (
                 title, institution, uoa, raw_text, 
@@ -196,27 +207,33 @@ def create_inference_case(filename, features, sentences, prediction, institution
         
         doc_id = cursor.lastrowid
 
-        # 3. Insert into 'inferences'
-        # Label is derived from the threshold (0.5)
-        impact_label = "High Impact" if prediction['score'] >= 0.5 else "Low Impact"
+        gates = prediction.get('feature_gates', [])
+
+        attr_dict = {name: val for name, val in zip(GTF_ORDER, gates)}
+        attr_blob = json.dumps(attr_dict)
         
         cursor.execute("""
             INSERT INTO inferences (
-                document_id, config_id, score, label
-            ) VALUES (?, ?, ?, ?)
+                document_id, config_id, score, prediction_label, 
+                true_label, narrative_contribution, feature_contribution, 
+                feature_attributions
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             doc_id,
             config_id,
             prediction['score'],
-            impact_label
+            prediction['label'], # "High Impact" or "Low Impact"
+            None,                # Ground truth unknown for new uploads
+            prediction['narrative_contribution'],
+            prediction['feature_contribution'],
+            attr_blob
         ))
         
         inf_id = cursor.lastrowid
 
         # 4. Insert into 'attentions' (Bulk insert for speed)
         att_data = prediction.get('attention')
-        
-        if isinstance(att_data, (list, tuple)) and len(att_data) > 0:
+        if att_data and len(att_data) > 0:
             att_records = [
                 (inf_id, sent, weight)
                 for sent, weight in zip(sentences, att_data)
@@ -226,10 +243,7 @@ def create_inference_case(filename, features, sentences, prediction, institution
                 INSERT INTO attentions (inference_id, sentence_text, weight)
                 VALUES (?, ?, ?)
             """, att_records)
-            print(f"--- INFO: Saved {len(att_records)} sentence weights for Heatmap ---")
-        else:
-            # Full-text model logic: No heatmap to save
-            print("--- INFO: Model is Full-Text level. Skipping Attentions table. ---")
+            print(f"--- INFO: Saved {len(att_records)} sentences to Heatmap ---")
 
         conn.commit()
         return doc_id

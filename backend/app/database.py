@@ -39,13 +39,20 @@ def init_db():
             config_id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE,
             architecture TEXT,
-            checkpoint_path TEXT,
-            scaler_path TEXT,
+            checkpoint_path TEXT,                                               -- Path to .pth or pt file
+            scaler_path TEXT,                                                   -- Path to feature scaler   
             embedding_name TEXT,
             input_dim INTEGER,
-            use_features INTEGER, -- some models (Qwen) do not use features 
-            input_granularity TEXT, -- 'sentence' or 'document'
-            task TEXT -- 'classification' or 'regression'
+            feature_dim INTEGER,
+            hidden_dim INTEGER DEFAULT 128,
+            fusion_type TEXT DEFAULT 'gated',
+            input_granularity TEXT,                                             -- 'sentence' or 'document'
+            task TEXT,                                                          -- 'classification' or 'regression'
+
+            global_importance_path TEXT,                                        -- Path to global importance scores
+            case_attribution_path TEXT,
+
+            use_features INTEGER -- some models (Qwen) do not use features 
         )
     """)
     print("Created 'model_configs' table.")
@@ -55,8 +62,16 @@ def init_db():
             inference_id INTEGER PRIMARY KEY AUTOINCREMENT,
             document_id INTEGER NOT NULL,
             config_id INTEGER NOT NULL,
-            score REAL,
-            label TEXT,
+
+            score REAL,                                                                     -- Predicted score (0-1 or 1-4)
+            true_label REAL,                                                                -- True label (0 or 1 for classification, GPA for regression)
+            prediction_label TEXT,                                                          -- High/Low impact
+
+            narrative_contribution REAL,                                                    -- LLMBranchContribution
+            feature_contribution REAL,                                                      -- HandcraftedBranchContribution
+
+            feature_attributions TEXT,
+
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (document_id) REFERENCES documents(document_id) ON DELETE CASCADE,
             FOREIGN KEY (config_id) REFERENCES model_configs(config_id) ON DELETE CASCADE

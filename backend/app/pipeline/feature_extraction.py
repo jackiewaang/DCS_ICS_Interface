@@ -19,7 +19,7 @@ GTF_ORDER = [
     "Flesch Reading Ease", "Dale-Chall Readability Score", "SMOG Index", "Automated Readability Index",
     "Sentiment (mean)", "Sentiment (10th)", "Sentiment (50th)", "Sentiment (75th)", "Sentiment (90th)",
     "Number of organizations mentioned", "Number of named individuals", "Number of countries or regions mentioned",
-    "Total monetary value", "Word count", "Paragraph count",
+    "Word count", "Paragraph count",
     'PERSON', 'NORP', 'FAC', 'ORG', 'GPE', 'LOC', 'PRODUCT', 'EVENT',
     'WORK_OF_ART', 'LAW', 'LANGUAGE', 'DATE', 'TIME', 'PERCENT', 'MONEY',
     'QUANTITY', 'ORDINAL', 'CARDINAL'
@@ -100,42 +100,52 @@ def run_extraction(text: str) -> Tuple[Dict, List[float]]:
     1. A dictionary for the Frontend (with strings and lists)
     2. A flat list of 33 floats in the exact order the Scaler expects.
     """
+
+    # Initialise all features
     feats = {cat: 0 for cat in GTF_ORDER}
     
-    # Readability
+    # Readability features
     feats["Flesch Reading Ease"] = textstat.flesch_reading_ease(text)
     feats["Dale-Chall Readability Score"] = textstat.dale_chall_readability_score(text)
     feats["SMOG Index"] = textstat.smog_index(text)
     feats["Automated Readability Index"] = textstat.automated_readability_index(text)
 
-    # Sentiment
+    # Sentiment features
     sentences = sent_tokenize(text)
-    scores = [sia.polarity_scores(s)["compound"] for s in sentences]
-    if scores:
-        feats["Sentiment (mean)"] = statistics.mean(scores)
-        feats["Sentiment (10th)"] = statistics.quantiles(scores, n=10)[0]
-        feats["Sentiment (50th)"] = statistics.median(scores)
-        feats["Sentiment (75th)"] = statistics.quantiles(scores, n=4)[2]
-        feats["Sentiment (90th)"] = statistics.quantiles(scores, n=10)[8]
+    sentiments = [sia.polarity_scores(s)["compound"] for s in sentences]
+    if sentiments:
+        feats["Sentiment (mean)"] = round(statistics.mean(sentiments), 4)
+        feats["Sentiment (10th)"] = round(statistics.quantiles(sentiments, n=10)[0], 4)
+        feats["Sentiment (50th)"] = round(statistics.median(sentiments), 4)
+        feats["Sentiment (75th)"] = round(statistics.quantiles(sentiments, n=4)[2], 4)
+        feats["Sentiment (90th)"] = round(statistics.quantiles(sentiments, n=10)[8], 4)
 
-    # NER
+    # NER feature extraction
     doc = nlp(text)
+
+    unique_entities = {etype: set() for etype in [
+        'PERSON', 'NORP', 'FAC', 'ORG', 'GPE', 'LOC', 'PRODUCT', 'EVENT',
+        'WORK_OF_ART', 'LAW', 'LANGUAGE', 'DATE', 'TIME', 'PERCENT', 'MONEY',
+        'QUANTITY', 'ORDINAL', 'CARDINAL'
+    ]}
+
     for ent in doc.ents:
-        if ent.label_ in feats:
-            feats[ent.label_] += 1
-            
+        if ent.label_ in unique_entities:
+            unique_entities[ent.label_].add(ent.text.lower())
+    
+    for etype, ent_set in unique_entities.items():
+        feats[etype] = len(ent_set)
+
     feats["Number of organizations mentioned"] = feats['ORG']
     feats["Number of named individuals"] = feats['PERSON']
     feats["Number of countries or regions mentioned"] = feats['GPE']
     
-    money_list = [ent.text for ent in doc.ents if ent.label_ == "MONEY"]
-    print(f"--- DEBUG MONEY: SpaCy found these entities: {money_list} ---") # ADD THIS
-    total_money = 0.0
-    for m in money_list:
-        total_money += clean_currency_string(m)
+    # money_list = [ent.text for ent in doc.ents if ent.label_ == "MONEY"]
+    # total_money = 0.0
+    # for m in money_list:
+    #     total_money += clean_currency_string(m)
     
-    feats["Total monetary value"] = total_money
-    print(f"--- DEBUG MONEY: Grand Total for features: {total_money} ---") # ADD THIS
+    # feats["Total monetary value"] = total_money
 
     feats["Word count"] = len(text.split())
     feats["Paragraph count"] = text.count('\n\n') + 1
@@ -145,9 +155,9 @@ def run_extraction(text: str) -> Tuple[Dict, List[float]]:
     
     ui_data = feats.copy()
     ui_data["highlights"] = {
-        "orgs": list(set([ent.text for ent in doc.ents if ent.label_ == "ORG"])),
-        "people": list(set([ent.text for ent in doc.ents if ent.label_ == "PERSON"])),
-        "money": list(set([ent.text for ent in doc.ents if ent.label_ == "MONEY"])),
+        "orgs": list(unique_entities['ORG']),
+        "people": list(unique_entities['PERSON']),
+        "money": list(unique_entities['MONEY']),
     }
 
     return ui_data, ordered_list

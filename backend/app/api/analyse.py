@@ -54,17 +54,11 @@ async def analyse_document(config_id, file: UploadFile = File(...)):
         uoa = ui_features.get("uoa", "Unknown UoA")
 
         # Map the prediction for the CRUD function
-        prediction_data = {
-            "score": results["score"],
-            "attention": results["attention"]
-        }
-
-        # Save to DB
         doc_id = create_inference_case(
             filename=file.filename,
             features=ui_features, 
             sentences=sentences,
-            prediction=prediction_data,
+            prediction=results, 
             institution=inst,
             uoa=uoa,
             config_id=int(config_id)
@@ -76,7 +70,11 @@ async def analyse_document(config_id, file: UploadFile = File(...)):
             "results": {
                 "score": results["score"],
                 "label": results["label"],
-                "heatmap": results["attention"]
+                "heatmap": results["attention"],
+                # Add these so the frontend can render the charts immediately
+                "narrative_contribution": results.get("narrative_contribution"),
+                "feature_contribution": results.get("feature_contribution"),
+                "feature_gates": results.get("feature_gates")
             },
             "writing_stats": ui_features,
             "sentences": sentences
