@@ -4,28 +4,26 @@ import { decodeHTML } from '@/helper/utils';
 const NERComp = ({ data }) => {
   const nerData = data?.entities || {};
   
-  // Standard IDs used for the UI, with an 'aliases' array to handle schema mismatches
   const categories = [
     { id: "ORG", aliases: ["orgs", "ORG"], label: "Organizations & Partners" },
-    { id: "MONEY", aliases: ["money", "MONEY"], label: "Economic & Financial Markers" },
-    { id: "PERSON", aliases: ["people", "PERSON"], label: "Key Individuals & Stakeholders" }
+    { id: "MONEY", aliases: ["money", "MONEY"], label: "Economic Impact" },
+    { id: "PERSON", aliases: ["people", "PERSON"], label: "Key Individuals" }
   ];
 
   return (
-    <div className="mt-12 pt-12 border-t border-slate-200">
-      <div className="mb-8">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-          Extracted Evidence Index
-        </h3>
-        <p className="text-[10px] text-slate-400 mt-1">
-          Entity clusters identified by spaCy TRF and mapped to predictive linguistic features.
+    <div className="space-y-6">
+      
+      {/* EXPLANATION SECTION */}
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.18em] mb-1.5">Evidence Index</h3>
+        <p className="text-xs text-slate-600 leading-relaxed">
+          Key entities extracted from the narrative that may influence impact assessment: organizations, financial impact, and stakeholder involvement.
         </p>
       </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+
+      {/* CARDS GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {categories.map((cat) => {
-          // --- THE MAPPING LOGIC ---
-          // This looks for 'ORG' first, and falls back to 'orgs' if 'ORG' is undefined.
           const rawItems = cat.aliases.reduce((acc, alias) => {
             return acc.length > 0 ? acc : (nerData[alias] || []);
           }, []);
@@ -35,31 +33,34 @@ const NERComp = ({ data }) => {
           ).filter(Boolean);
 
           return (
-            <div key={cat.id} className="flex flex-col">
-              <h4 className="text-sm font-bold text-slate-900 mb-4 border-b border-slate-100 pb-2 flex justify-between items-center">
-                {cat.label}
-                <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full border border-blue-100">
+            <div key={cat.id} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+              
+              {/* HEADER */}
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-sm font-bold text-slate-900">{cat.label}</h4>
+                <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-1 rounded-full">
                   {items.length}
                 </span>
-              </h4>
-              
+              </div>
+
+              {/* CONTENT */}
               {items.length > 0 ? (
                 <ul className="space-y-2">
-                  {items.slice(0, 15).map((item, idx) => (
-                    <li key={idx} className="text-xs text-slate-600 flex items-start gap-2 group">
-                      <span className="text-blue-400 select-none group-hover:text-blue-600 transition-colors">•</span>
+                  {items.slice(0, 12).map((item, idx) => (
+                    <li key={idx} className="text-xs text-slate-700 flex items-start gap-2">
+                      <span className="text-slate-400 select-none shrink-0 mt-1">•</span>
                       <span className="leading-relaxed">{item}</span>
                     </li>
                   ))}
                   
-                  {items.length > 15 && (
-                    <li className="text-[10px] text-slate-400 italic pt-1 pl-4 border-t border-slate-50 mt-2">
-                      + {items.length - 15} additional entries detected
+                  {items.length > 12 && (
+                    <li className="text-[10px] text-slate-500 pt-2 mt-2 border-t border-slate-200 italic">
+                      +{items.length - 12} more detected
                     </li>
                   )}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-400 italic">No evidence detected in this category.</p>
+                <p className="text-xs text-slate-500 italic">No evidence detected</p>
               )}
             </div>
           );

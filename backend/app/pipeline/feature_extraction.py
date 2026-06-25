@@ -27,7 +27,6 @@ GTF_ORDER = [
 
 def clean_text(text):
 
-    """REVERTED: Your previous working implementation."""
     text = html.unescape(text)
     text = text.replace('\\n', '\n').replace("\\'", "'").replace("`", "'")
 

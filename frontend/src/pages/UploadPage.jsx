@@ -47,26 +47,26 @@ const UploadPage = ({ onAnalysisComplete, activeConfigId }) => {
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 md:p-12 space-y-10">
+    <div className="w-full max-w-5xl mx-auto p-6 md:p-8 space-y-8">
       
       <header className="space-y-2">
-        <h1 className="text-3xl font-semibold text-slate-900 tracking-tight">
+        <h1 className="text-2xl md:text-[2rem] font-semibold text-slate-950 tracking-tight">
           New Case Analysis
         </h1>
-        <p className="text-slate-500 text-lg max-w-2xl leading-relaxed">
+        <p className="text-slate-500 text-base max-w-2xl leading-relaxed">
           Upload a research case document to receive an in-depth evaluation using the active model engine.
         </p>
       </header>
 
       <Card 
-        className={`border-2 border-dashed border-slate-200 shadow-none bg-white flex flex-col h-80 overflow-hidden transition-all duration-200 
+        className={`border-2 border-dashed border-slate-200 shadow-none bg-white flex flex-col h-72 overflow-hidden transition-all duration-200 
           ${!file ? 'hover:bg-slate-50 hover:border-blue-300' : 'border-solid'}`}
       >
         <CardContent className="p-0 flex-1 flex flex-col">
           {!file ? (
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="group h-full w-full flex flex-col items-center justify-center cursor-pointer p-10"
+              className="group h-full w-full flex flex-col items-center justify-center cursor-pointer p-8"
             >
               <input 
                 type="file" 
@@ -75,22 +75,22 @@ const UploadPage = ({ onAnalysisComplete, activeConfigId }) => {
                 onChange={handleFileChange}
                 accept=".pdf,.docx,.txt"
               />
-              <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6 border border-slate-100 group-hover:scale-105 group-hover:bg-white group-hover:border-blue-200 transition-all duration-300">
-                <Upload className="h-10 w-10 text-slate-400 group-hover:text-blue-600 transition-colors" />
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-5 border border-slate-100 group-hover:scale-105 group-hover:bg-white group-hover:border-slate-300 transition-all duration-300">
+                <Upload className="h-8 w-8 text-slate-400 group-hover:text-slate-700 transition-colors" />
               </div>
-              <h3 className="text-xl font-bold text-slate-700">Drop your case study here</h3>
-              <p className="text-sm text-slate-400 mt-2 font-medium">PDF, Word, or Text files are supported</p>
+              <h3 className="text-lg font-semibold text-slate-700">Drop your case study here</h3>
+              <p className="text-sm text-slate-400 mt-2 font-medium">PDF, Word, or text files are supported</p>
             </div>
           ) : (
-            <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col justify-center">
-              <div className="flex items-center justify-between bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-slate-900 rounded-lg flex items-center justify-center shadow-md">
-                    <FileText className="h-7 w-7 text-white" />
+            <div className="p-7 space-y-7 animate-in fade-in slide-in-from-bottom-2 h-full flex flex-col justify-center">
+              <div className="flex items-center justify-between bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-slate-950 rounded-lg flex items-center justify-center shadow-md">
+                    <FileText className="h-6 w-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-lg font-bold text-slate-900">{file.name}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-widest font-black">
+                    <p className="text-base font-semibold text-slate-900">{file.name}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-[0.18em] font-black">
                       {(file.size / 1024).toFixed(0)} KB • Ready for evaluation
                     </p>
                   </div>
@@ -136,7 +136,7 @@ const UploadPage = ({ onAnalysisComplete, activeConfigId }) => {
                 <div className="flex justify-end">
                   <Button 
                     onClick={handleUpload}
-                    className="h-12 px-10 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all cursor-pointer shadow-lg active:scale-95"
+                    className="h-11 px-8 bg-slate-950 hover:bg-slate-800 text-white font-semibold rounded-md transition-all cursor-pointer shadow-lg active:scale-95"
                   >
                     <div className="flex items-center gap-2">
                       Start Analysis
@@ -150,7 +150,7 @@ const UploadPage = ({ onAnalysisComplete, activeConfigId }) => {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12 pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-2">
         <InstructionCard 
           step="Step 1" 
           title="Sectional Embedding" 
@@ -172,16 +172,16 @@ const UploadPage = ({ onAnalysisComplete, activeConfigId }) => {
 };
 
 const MetricBox = ({ label, value }) => (
-  <div className="bg-white border border-slate-200 p-6 rounded-xl shadow-sm">
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-2xl font-bold text-slate-900">{value}</p>
+  <div className="bg-white border border-slate-200 p-5 rounded-xl shadow-sm">
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.18em] mb-1">{label}</p>
+    <p className="text-xl font-semibold text-slate-900">{value}</p>
   </div>
 );
 
 const InstructionCard = ({ step, title, desc }) => (
   <div className="space-y-3 p-2">
-    <span className="text-xs font-black text-blue-600 uppercase tracking-[0.2em]">{step}</span>
-    <h4 className="font-bold text-slate-900 text-base">{title}</h4>
+    <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{step}</span>
+    <h4 className="font-semibold text-slate-900 text-sm">{title}</h4>
     <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
   </div>
 );

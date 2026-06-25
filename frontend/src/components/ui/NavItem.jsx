@@ -1,12 +1,12 @@
 function NavItem({ icon, label, isActive, onClick, isCollapsed }) {
     return (
         <button onClick={onClick} title={isCollapsed ? label : ""}
-        className={`w-full flex items-center transition-all duration-200 px-4 py-3 rounded-lg text-sm font-medium cursor-pointer ${
+        className={`w-full flex items-center transition-all duration-200 px-3 py-2.5 rounded-md text-sm font-medium cursor-pointer ${
             isCollapsed ? "justify-center" : "gap-3"
         } ${
             isActive
-            ? "bg-indigo-600 text-white shadow-md"
-            : "hover:bg-slate-800 hover:text-white"
+            ? "bg-slate-100 text-slate-900 shadow-sm"
+            : "hover:bg-slate-100 hover:text-slate-900"
         }`}
         >
             {icon}

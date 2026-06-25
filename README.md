@@ -48,6 +48,12 @@ npm run dev
 
 Vite will print the dev URL (typically `http://localhost:5173`).
 
+### Optional sample-data mode
+
+If you want to work on the UI without the backend running, set `VITE_USE_SAMPLE_DATA=true` before starting Vite. The frontend will then use the local JSON files in `frontend/public/` as demo data.
+
+You can also override the backend URL with `VITE_API_BASE` if your FastAPI server runs on a different port.
+
 ## Running both together (dev)
 
 You should have two terminals running:
