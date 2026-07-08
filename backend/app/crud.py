@@ -1,9 +1,11 @@
-import sqlite3
 import json
-from datetime import datetime
-import os
 
-DB_PATH = "app/database.db"
+from sqlalchemy import cast, or_, select, String
+from sqlalchemy.orm import joinedload
+
+from app.database import SessionLocal
+from app.models.document import DocumentFeatures, DocumentMetadata
+from app.models.inference import Attention, Inference, ModelConfig
 
 GTF_ORDER = [
     "Flesch Reading Ease", "Dale-Chall Readability Score", "SMOG Index", "Automated Readability Index",
@@ -15,242 +17,224 @@ GTF_ORDER = [
     'QUANTITY', 'ORDINAL', 'CARDINAL'
 ]
 
-def dict_factory(cursor, row):
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
+
+def _document_payload(document: DocumentMetadata) -> dict:
+    features = document.features
+    return {
+        "document_id": document.document_id,
+        "case_id": document.case_id,
+        "title": document.title,
+        "institution": document.institution,
+        "uoa": document.uoa,
+        "status": document.status,
+        "ref_year": document.ref_year,
+        "gpa": document.gpa,
+        "impact_label": document.impact_label,
+        "raw_text": document.raw_text,
+        "sections": {
+            "summary": document.summary_text or "",
+            "research": document.research_text or "",
+            "impact": document.impact_text or "",
+        },
+        "features_json": features.features_json if features else None,
+        "entities_json": features.entities_json if features else None,
+    }
+
+
+def _parse_feature_blobs(case_dict: dict) -> dict:
+    case_dict["features"] = json.loads(case_dict.get("features_json") or "{}")
+    case_dict["entities"] = json.loads(case_dict.get("entities_json") or "{}")
+    return case_dict
+
 
 def get_cases(search_query: str = None, uoa: str = None):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = dict_factory
-    cursor = conn.cursor()
-    
-    # We change the base to 'inferences' to ensure every analysis run is visible.
-    # Joining with 'model_configs' gives us the friendly name of the AI model.
-    query = """
-        SELECT 
-            i.inference_id, 
-            d.document_id, 
-            d.case_id, 
-            d.title, 
-            d.institution, 
-            d.uoa, 
-            d.gpa, 
-            i.score as model_prediction,       -- 0-1 probability
-            i.prediction_label as model_label, -- High or Low
-            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
-            mc.name as model_name
-        FROM inferences i
-        JOIN documents d ON i.document_id = d.document_id
-        JOIN model_configs mc ON i.config_id = mc.config_id
-        WHERE 1=1
-    """
-    params = []
-    
-    if search_query:
-        # Search across Title, ID, or Institution
-        query += " AND (d.title LIKE ? OR d.institution LIKE ? OR d.document_id LIKE ?)"
-        params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
-    
-    if uoa:
-        query += " AND d.uoa = ?"
-        params.append(uoa)
-    
-    # Order by inference_id so the most recent analysis is always at the top
-    query += " ORDER BY i.inference_id DESC"
-    
-    cursor.execute(query, params)
-    results = cursor.fetchall()
-    conn.close()
-    return results
+    with SessionLocal() as db:
+        stmt = (
+            select(
+                Inference.inference_id,
+                DocumentMetadata.document_id,
+                DocumentMetadata.case_id,
+                DocumentMetadata.title,
+                DocumentMetadata.institution,
+                DocumentMetadata.uoa,
+                DocumentMetadata.gpa,
+                Inference.score.label("model_prediction"),
+                Inference.prediction_label.label("model_label"),
+                Inference.true_label.label("true_label"),
+                ModelConfig.name.label("model_name"),
+            )
+            .join(DocumentMetadata, Inference.document_id == DocumentMetadata.document_id)
+            .join(ModelConfig, Inference.config_id == ModelConfig.config_id)
+        )
+
+        if search_query:
+            search = f"%{search_query}%"
+            stmt = stmt.where(
+                or_(
+                    DocumentMetadata.title.like(search),
+                    DocumentMetadata.institution.like(search),
+                    cast(DocumentMetadata.document_id, String).like(search),
+                )
+            )
+
+        if uoa:
+            stmt = stmt.where(DocumentMetadata.uoa == uoa)
+
+        stmt = stmt.order_by(Inference.inference_id.desc())
+        return [dict(row) for row in db.execute(stmt).mappings().all()]
+
 
 def get_inference_details(inference_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = dict_factory
-    cursor = conn.cursor()
+    with SessionLocal() as db:
+        inference = db.scalar(
+            select(Inference)
+            .options(
+                joinedload(Inference.document).joinedload(DocumentMetadata.features),
+                joinedload(Inference.model_config),
+            )
+            .where(Inference.inference_id == inference_id)
+        )
 
-    cursor.execute("""
-        SELECT 
-            d.*, 
-            i.inference_id,
-            i.score as model_prediction,       -- 0-1 probability
-            i.prediction_label as model_label, -- High or Low
-            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
-            mc.name as model_name,
-            mc.input_granularity
-        FROM inferences i
-        JOIN documents d ON i.document_id = d.document_id
-        JOIN model_configs mc ON i.config_id = mc.config_id
-        WHERE i.inference_id = ?
-    """, (inference_id,))
-    
-    row = cursor.fetchone()
-    conn.close() # Close early since we have the data
-    
-    if not row:
-        return None
-    
-    case_dict = dict(row)
-    
-    # --- JSON PARSING (Mandatory for Frontend) ---
-    case_dict['features'] = json.loads(case_dict['features_json']) if case_dict.get('features_json') else {}
-    case_dict['entities'] = json.loads(case_dict['entities_json']) if case_dict.get('entities_json') else {}
-    
-    # --- HEATMAP FETCH ---
-    case_dict['heatmap'] = get_heatmap_for_inference(inference_id)
-    
-    return case_dict
+        if not inference:
+            return None
+
+        case_dict = _document_payload(inference.document)
+        case_dict.update(
+            {
+                "inference_id": inference.inference_id,
+                "model_prediction": inference.score,
+                "model_label": inference.prediction_label,
+                "true_label": inference.true_label,
+                "model_name": inference.model_config.name,
+                "input_granularity": inference.model_config.input_granularity,
+            }
+        )
+        _parse_feature_blobs(case_dict)
+        case_dict["heatmap"] = get_heatmap_for_inference(inference_id)
+        return case_dict
+
 
 def get_heatmap_for_inference(inference_id: int):
-    """
-    Fetches sentence-level attention weights for a specific model run.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = dict_factory
-    cursor = conn.cursor()
+    with SessionLocal() as db:
+        stmt = (
+            select(
+                Attention.sentence_text,
+                Attention.weight.label("attention_score"),
+            )
+            .where(Attention.inference_id == inference_id)
+            .order_by(Attention.attention_id)
+        )
+        return [dict(row) for row in db.execute(stmt).mappings().all()]
 
-    # We filter strictly by inference_id to get only THIS model's perspective
-    cursor.execute("""
-        SELECT 
-            sentence_text, 
-            weight as attention_score 
-        FROM attentions 
-        WHERE inference_id = ?
-    """, (inference_id,))
-    
-    rows = cursor.fetchall()
-    conn.close()
-    
-    return rows # This will be a list of dictionaries
 
 def get_case_by_id(document_id: int):
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = dict_factory
-    cursor = conn.cursor()
+    with SessionLocal() as db:
+        inference = db.scalar(
+            select(Inference)
+            .options(
+                joinedload(Inference.document).joinedload(DocumentMetadata.features),
+                joinedload(Inference.model_config),
+            )
+            .where(Inference.document_id == document_id)
+            .order_by(Inference.inference_id.desc())
+            .limit(1)
+        )
 
-    # 1. Get the Document and its latest Inference
-    cursor.execute("""
-        SELECT 
-            d.*, 
-            i.inference_id,
-            i.score as model_prediction,       -- 0-1 probability
-            i.prediction_label as model_label, -- High or Low
-            i.true_label as model_label,       -- 1.0 - 4.0 GPA rating
-            mc.name as model_name
-        FROM documents d
-        LEFT JOIN inferences i ON d.document_id = i.document_id
-        LEFT JOIN model_configs mc ON i.config_id = mc.config_id
-        WHERE d.document_id = ?
-        ORDER BY i.inference_id DESC LIMIT 1
-    """, (document_id,))
+        if inference:
+            case_dict = _document_payload(inference.document)
+            case_dict.update(
+                {
+                    "inference_id": inference.inference_id,
+                    "model_prediction": inference.score,
+                    "model_label": inference.prediction_label,
+                    "true_label": inference.true_label,
+                    "model_name": inference.model_config.name,
+                }
+            )
+            _parse_feature_blobs(case_dict)
+            case_dict["heatmap"] = get_heatmap_for_inference(inference.inference_id)
+            return case_dict
 
-    print(f"--- DEBUG: Executed get_case_by_id with document_id={document_id} ---")
-    
-    row = cursor.fetchone()
-    print(row)
-    if not row:
-        conn.close()
-        return None
+        document = db.scalar(
+            select(DocumentMetadata)
+            .options(joinedload(DocumentMetadata.features))
+            .where(DocumentMetadata.document_id == document_id)
+        )
 
-    case_dict = dict(row)
-    
-    # 2. Parse the JSON blobs so the frontend gets objects, not strings
-    case_dict['features'] = json.loads(case_dict['features_json']) if case_dict['features_json'] else {}
-    case_dict['entities'] = json.loads(case_dict['entities_json']) if case_dict['entities_json'] else {}
+        if not document:
+            return None
 
-    # 3. Get the Heatmap (Attentions) linked to that specific inference
-    if case_dict['inference_id']:
-        cursor.execute("""
-            SELECT sentence_text, weight as attention_score 
-            FROM attentions 
-            WHERE inference_id = ?
-        """, (case_dict['inference_id'],))
-        attention_rows = cursor.fetchall()
-        case_dict['heatmap'] = attention_rows
-    else:
-        case_dict['heatmap'] = []
+        case_dict = _document_payload(document)
+        case_dict.update(
+            {
+                "inference_id": None,
+                "model_prediction": None,
+                "model_label": None,
+                "true_label": None,
+                "model_name": None,
+                "heatmap": [],
+            }
+        )
+        return _parse_feature_blobs(case_dict)
 
-    conn.close()
-    return case_dict
 
 def create_inference_case(filename, features, sentences, prediction, institution, uoa, config_id):
     """
-    Saves new inference data into the ref_language database.
+    Saves new inference data into the database.
     Leaves case_id, ref_year, gpa, and impact_label as NULL for new inferences.
     """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    with SessionLocal() as db:
+        try:
+            entities_blob = json.dumps(features.get("highlights", {}))
+            stats_only = {k: v for k, v in features.items() if k != "highlights"}
+            features_blob = json.dumps(stats_only)
 
-    try:
-        # 1. Prepare JSON blobs
-        entities_blob = json.dumps(features.get("highlights", {}))
-        
-        # Filter out the non-numeric highlight data for the features_json
-        stats_only = {k: v for k, v in features.items() if k != "highlights"}
-        features_blob = json.dumps(stats_only)
-        
-        # 2. Insert into 'documents'
-        cursor.execute("""
-            INSERT INTO documents (
-                title, institution, uoa, raw_text, 
-                features_json, entities_json
-            ) VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            f"[Inference] {filename}",
-            institution,
-            uoa,
-            "\n\n".join(sentences),
-            features_blob,
-            entities_blob
-        ))
-        
-        doc_id = cursor.lastrowid
+            document = DocumentMetadata(
+                title=f"[Inference] {filename}",
+                institution=institution,
+                uoa=uoa,
+                raw_text="\n\n".join(sentences),
+                features=DocumentFeatures(
+                    features_json=features_blob,
+                    entities_json=entities_blob,
+                ),
+            )
+            db.add(document)
+            db.flush()
 
-        gates = prediction.get('feature_gates', [])
+            gates = prediction.get("feature_gates", [])
+            attr_dict = {name: val for name, val in zip(GTF_ORDER, gates)}
 
-        attr_dict = {name: val for name, val in zip(GTF_ORDER, gates)}
-        attr_blob = json.dumps(attr_dict)
-        
-        cursor.execute("""
-            INSERT INTO inferences (
-                document_id, config_id, score, prediction_label, 
-                true_label, narrative_contribution, feature_contribution, 
-                feature_attributions
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            doc_id,
-            config_id,
-            prediction['score'],
-            prediction['label'], # "High Impact" or "Low Impact"
-            None,                # Ground truth unknown for new uploads
-            prediction['narrative_contribution'],
-            prediction['feature_contribution'],
-            attr_blob
-        ))
-        
-        inf_id = cursor.lastrowid
+            inference = Inference(
+                document_id=document.document_id,
+                config_id=config_id,
+                score=prediction["score"],
+                prediction_label=prediction["label"],
+                true_label=None,
+                narrative_contribution=prediction["narrative_contribution"],
+                feature_contribution=prediction["feature_contribution"],
+                feature_attributions=json.dumps(attr_dict),
+            )
+            db.add(inference)
+            db.flush()
 
-        # 4. Insert into 'attentions' (Bulk insert for speed)
-        att_data = prediction.get('attention')
-        if att_data and len(att_data) > 0:
-            att_records = [
-                (inf_id, sent, weight)
-                for sent, weight in zip(sentences, att_data)
-            ]
-            
-            cursor.executemany("""
-                INSERT INTO attentions (inference_id, sentence_text, weight)
-                VALUES (?, ?, ?)
-            """, att_records)
-            print(f"--- INFO: Saved {len(att_records)} sentences to Heatmap ---")
+            att_data = prediction.get("attention")
+            if att_data and len(att_data) > 0:
+                db.add_all(
+                    [
+                        Attention(
+                            inference_id=inference.inference_id,
+                            sentence_text=sent,
+                            weight=weight,
+                        )
+                        for sent, weight in zip(sentences, att_data)
+                    ]
+                )
+                print(f"--- INFO: Saved {len(att_data)} sentences to Heatmap ---")
 
-        conn.commit()
-        return doc_id
-
-    except Exception as e:
-        conn.rollback()
-        print(f"DATABASE CRITICAL ERROR: {e}")
-        raise e
-    finally:
-        conn.close()
+            db.commit()
+            return document.document_id
+        except Exception as e:
+            db.rollback()
+            print(f"DATABASE CRITICAL ERROR: {e}")
+            raise

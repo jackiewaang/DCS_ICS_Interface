@@ -3,12 +3,9 @@ from app.services.utils import convert_bytes_to_text
 from app.pipeline.feature_extraction import clean_text, run_extraction
 from app.pipeline.generate_embeddings import embedding_engine
 from app.services.inference_service import inference_engine
-from app.database import get_model_config 
+from app.database import get_model_config, list_model_configs
 from app.services.utils import get_ref_sections
 from app.crud import create_inference_case
-import sqlite3
-
-DB_PATH = "app/database.db"
 
 router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 
@@ -90,28 +87,16 @@ def list_configs():
     Fetches all available model configurations for the frontend sidebar.
     """
     try:
-        conn = sqlite3.connect(DB_PATH)
-        # This allows us to access columns by name (e.g., row['name'])
-        conn.row_factory = sqlite3.Row 
-        cursor = conn.cursor()
-        
-        # We select the specific columns needed by the React sidebar
-        cursor.execute("""
-            SELECT 
-                config_id, 
-                name, 
-                architecture, 
-                use_features, 
-                input_granularity 
-            FROM model_configs
-        """)
-        
-        rows = cursor.fetchall()
-        conn.close()
-        
-        # Convert sqlite3.Row objects into standard Python dictionaries
-        return [dict(row) for row in rows]
-        
+        return [
+            {
+                "config_id": config["config_id"],
+                "name": config["name"],
+                "architecture": config["architecture"],
+                "use_features": config["use_features"],
+                "input_granularity": config["input_granularity"],
+            }
+            for config in list_model_configs()
+        ]
     except Exception as e:
         print(f"DATABASE ERROR: {e}")
         raise HTTPException(status_code=500, detail="Could not retrieve model configurations.")

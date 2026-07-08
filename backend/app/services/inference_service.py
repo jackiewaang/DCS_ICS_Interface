@@ -206,9 +206,14 @@ class ModelManager:
                 scaler = joblib.load(config['scaler_path'])
             self.loaded_scalers[cfg_id] = scaler
 
+            feature_dim = config.get('feature_dim')
+            if not config.get('use_features'):
+                feature_dim = None
+
             model = AttentionMIL(
                 input_dim=config['input_dim'],
-                case_feat_dim=32,
+                hidden_dim=config.get('hidden_dim', 128),
+                case_feat_dim=feature_dim,
                 fusion_type=config.get('fusion_type', 'gated'),
                 mode=config.get('task', 'classification')
             )
@@ -226,11 +231,14 @@ class ModelManager:
         model, scaler = self.get_assets(config)
 
         feat_tensor = None
-        if scaler and ordered_features:
+        if ordered_features:
             print(f"RAW FEATURES: {ordered_features}")
-            scaled = scaler.transform([ordered_features])
-            print(f"SCALED FEATURES: {scaled[0]}")
-            feat_tensor = torch.tensor(scaled[0], dtype=torch.float32).to(self.device)
+            if scaler:
+                features = scaler.transform([ordered_features])[0]
+                print(f"SCALED FEATURES: {features}")
+            else:
+                features = ordered_features
+            feat_tensor = torch.tensor(features, dtype=torch.float32).to(self.device)
             
 
         emb_tensor = torch.tensor(embeddings, dtype=torch.float32).to(self.device)
@@ -247,9 +255,9 @@ class ModelManager:
             "score": score,
             "label": "High Impact" if score >= 0.5 else "Low Impact",
             
-            "attention": attn.squeeze().cpu().numpy().tolist(),
+            "attention": attn.detach().view(-1).cpu().numpy().tolist(),
             
-            "feature_gates": gates.squeeze().cpu().numpy().tolist() if gates is not None else [],
+            "feature_gates": gates.detach().view(-1).cpu().numpy().tolist() if gates is not None else [],
             
             "narrative_contribution": round(float(text_imp.item()), 4),
             "feature_contribution": round(float(feat_imp.item()), 4)
