@@ -4,12 +4,14 @@ import SearchHeader from '@/components/SearchHeader';
 import CaseHeader from '@/components/CaseHeader';
 import { api } from '@/services/api'; // Centralized API service
 import MainOverviewPanel from '@/components/dashboard/MainOverviewPanel';
+import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
 import HeatmapPanel from '@/components/dashboard/HeatmapPanel';
 import FeaturesPanel from '@/components/dashboard/FeaturesPanel';
 import EntitiesPanel from '@/components/dashboard/EntitiesPanel';
 
 const TABS = [
   { id: 'main', label: 'Main' },
+  { id: 'ai', label: 'AI Insights' },
   { id: 'heatmap', label: 'Heatmap' },
   { id: 'features', label: 'Features' },
   { id: 'entities', label: 'Entities' },
@@ -104,6 +106,7 @@ const Dashboard = ({ initialCaseId, onClearInitial }) => {
 
         <main className="max-w-7xl mx-auto px-6 py-5">
           {activeTab === 'main' && <MainOverviewPanel data={caseData} />}
+          {activeTab === 'ai' && <AIInsightsPanel data={caseData} />}
           {activeTab === 'heatmap' && <HeatmapPanel data={caseData} />}
           {activeTab === 'features' && <FeaturesPanel data={caseData} />}
           {activeTab === 'entities' && <EntitiesPanel data={caseData} />}

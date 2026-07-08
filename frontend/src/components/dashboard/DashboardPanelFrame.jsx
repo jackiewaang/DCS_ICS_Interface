@@ -18,7 +18,7 @@ export function DashboardHelp({ text }) {
   );
 }
 
-export function DashboardPanelFrame({ title, helpText, children, expandedChildren, className = '' }) {
+export function DashboardPanelFrame({ title, helpText, children, expandedChildren, headerActions = null, className = '' }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -46,14 +46,18 @@ export function DashboardPanelFrame({ title, helpText, children, expandedChildre
             {helpText ? <DashboardHelp text={helpText} /> : null}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsExpanded(true)}
-            aria-label={`Expand ${title} panel`}
-            className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Maximize2 className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              aria-label={`Expand ${title} panel`}
+              className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {children}
@@ -68,14 +72,18 @@ export function DashboardPanelFrame({ title, helpText, children, expandedChildre
                 {helpText ? <DashboardHelp text={helpText} /> : null}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsExpanded(false)}
-                aria-label={`Close expanded ${title} panel`}
-                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                {headerActions}
+
+                <button
+                  type="button"
+                  onClick={() => setIsExpanded(false)}
+                  aria-label={`Close expanded ${title} panel`}
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
