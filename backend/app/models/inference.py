@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -40,6 +40,28 @@ class ModelConfig(Base):
         back_populates="model_config",
         cascade="all, delete-orphan",
     )
+    feature_importances = relationship(
+        "ModelFeatureImportance",
+        back_populates="model_config",
+        cascade="all, delete-orphan",
+    )
+
+
+class ModelFeatureImportance(Base):
+    __tablename__ = "model_feature_importances"
+    __table_args__ = (
+        UniqueConstraint("config_id", "feature_name", name="uq_model_feature_importance"),
+    )
+
+    importance_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    config_id: Mapped[int] = mapped_column(
+        ForeignKey("model_configs.config_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    feature_name: Mapped[str] = mapped_column(String, nullable=False)
+    mean_permutation_importance: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    model_config: Mapped[ModelConfig] = relationship(back_populates="feature_importances")
 
 
 class Inference(Base):
