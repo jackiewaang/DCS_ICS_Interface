@@ -55,8 +55,12 @@ function getFeatureRows(data, sortMode) {
   const features = data?.features || {};
   const attributions = data?.feature_attributions || {};
   const globalImportance = data?.global_importance || {};
+  const featureNames = Array.from(new Set([
+    ...Object.keys(globalImportance),
+    ...Object.keys(features),
+  ]));
 
-  const rows = Object.keys(globalImportance)
+  const rows = featureNames
     .filter((name) => !BLACKLISTED.includes(name))
     .filter((name) => !ENTITY_METRIC_SET.has(name))
     .map((featureName) => {

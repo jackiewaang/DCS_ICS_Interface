@@ -14,7 +14,7 @@ pipeline_manager = PipelineManager()
 
 
 class InferenceSections(BaseModel):
-    title: str = "Manual inference"
+    title: str = "Untitled inference"
     institution: str = "Unknown Institution"
     uoa: str = "Unknown UoA"
     summary: str = ""
@@ -76,7 +76,7 @@ def _save_inference_output(
 
     with SessionLocal() as db:
         document = DocumentMetadata(
-            title=f"[Inference] {sections.title}",
+            title=sections.title,
             institution=sections.institution,
             uoa=sections.uoa,
             raw_text="\n\n".join(

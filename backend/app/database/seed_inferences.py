@@ -17,6 +17,7 @@ MODELS_ROOT = BACKEND_ROOT / "assets" / "models"
 CASE_FEATURE_ATTENTION_TEST = "case_feature_attention_test.csv"
 FEATURE_VALIDATION_SUMMARY = "feature_validation_summary.csv"
 SENTENCE_ATTENTION_TEST = "sentence_attention_test.csv"
+ATTRIBUTION_SUFFIX = "_AbsAttribution"
 
 
 def seed_inferences(db: Session | None = None, models_root: Path = MODELS_ROOT) -> dict[str, int]:
@@ -174,6 +175,10 @@ def _seed_case_predictions(
                         row.get("Handcrafted_Branch_Contribution"),
                         default=None,
                     )
+                if hasattr(inference, "feature_attributions"):
+                    inference.feature_attributions = json.dumps(
+                        _feature_attributions_from_row(row)
+                    )
 
                 inference_by_case_id[case_id] = inference
 
@@ -257,6 +262,21 @@ def _sentence_attention_paths(model_dir: Path) -> list[Path]:
     if fold_paths:
         return fold_paths
     return [exact_path] if exact_path.exists() else []
+
+
+def _feature_attributions_from_row(row: dict[str, Any]) -> dict[str, float]:
+    attributions: dict[str, float] = {}
+    for column, value in row.items():
+        if not column.endswith(ATTRIBUTION_SUFFIX):
+            continue
+
+        feature_name = column[: -len(ATTRIBUTION_SUFFIX)]
+        if not feature_name:
+            continue
+
+        attributions[feature_name] = _safe_float(value, default=0.0) or 0.0
+
+    return attributions
 
 
 def _safe_float(value: Any, default: float | None = 0.0) -> float | None:

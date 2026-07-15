@@ -5,9 +5,9 @@ import { METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_defini
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
 
 const CATEGORIES = [
-  { id: 'ORG', aliases: ['orgs', 'ORG'], label: 'Mentioned Organizations (ORG)' },
-  { id: 'MONEY', aliases: ['money', 'MONEY'], label: 'Economic Impact (MONEY)' },
-  { id: 'PERSON', aliases: ['people', 'PERSON'], label: 'Mentioned Individuals (PERSON)' },
+  { id: 'ORG', aliases: ['orgs', 'ORG'], featureAliases: ['ORG', 'Number of organizations mentioned'], label: 'Mentioned Organizations (ORG)' },
+  { id: 'MONEY', aliases: ['money', 'MONEY'], featureAliases: ['MONEY'], label: 'Economic Impact (MONEY)' },
+  { id: 'PERSON', aliases: ['people', 'PERSON'], featureAliases: ['PERSON', 'Number of named individuals'], label: 'Mentioned Individuals (PERSON)' },
 ];
 
 function findFeatureKey(features, featureName) {
@@ -51,9 +51,13 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
     return CATEGORIES.map((category) => {
       const items = getCategoryItems(entities, category);
       const definition = METRIC_DEFINITIONS[category.id];
-      const featureKey = findFeatureKey(features, category.id);
-      const localRaw = attributions[category.id] ?? attributions[`${category.id}_AbsAttribution`] ?? 0;
-      const globalRaw = globalImportance[category.id] || 0;
+      const featureKey = category.featureAliases.map((alias) => findFeatureKey(features, alias)).find(Boolean);
+      const localRaw = category.featureAliases.reduce((value, alias) => (
+        value ?? attributions[alias] ?? attributions[`${alias}_AbsAttribution`]
+      ), undefined) ?? 0;
+      const globalRaw = category.featureAliases.reduce((value, alias) => (
+        value ?? globalImportance[alias]
+      ), undefined) || 0;
 
       return {
         ...category,
