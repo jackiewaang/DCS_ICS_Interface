@@ -3,6 +3,7 @@ from typing import Any
 
 import joblib
 import torch
+from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.models.inference import ModelConfig, ModelFeatureImportance
