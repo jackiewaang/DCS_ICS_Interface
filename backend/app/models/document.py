@@ -47,6 +47,8 @@ class DocumentFeatures(Base):
         unique=True,
         nullable=False,
     )
+    features_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    entities_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # READABILITY METRICS
     flesch_reading_ease: Mapped[float | None] = mapped_column(Float, nullable=True)

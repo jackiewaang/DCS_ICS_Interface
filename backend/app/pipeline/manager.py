@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 
-from app.crud import GTF_ORDER
 from app.database import SessionLocal
 from app.models.inference import ModelConfig, ModelFeatureImportance
 from app.pipeline.embedder import embedder
@@ -14,6 +13,40 @@ from app.services.inference_service import inference_engine
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_FEATURE_ORDER = [
+    "Flesch Reading Ease",
+    "Dale-Chall Readability Score",
+    "SMOG Index",
+    "Automated Readability Index",
+    "Sentiment (mean)",
+    "Sentiment (10th)",
+    "Sentiment (50th)",
+    "Sentiment (75th)",
+    "Sentiment (90th)",
+    "Number of organizations mentioned",
+    "Number of named individuals",
+    "Number of countries or regions mentioned",
+    "Word count",
+    "Paragraph count",
+    "PERSON",
+    "NORP",
+    "FAC",
+    "ORG",
+    "GPE",
+    "LOC",
+    "PRODUCT",
+    "EVENT",
+    "WORK_OF_ART",
+    "LAW",
+    "LANGUAGE",
+    "DATE",
+    "TIME",
+    "PERCENT",
+    "MONEY",
+    "QUANTITY",
+    "ORDINAL",
+    "CARDINAL",
+]
 
 
 class PipelineManager:
@@ -142,7 +175,7 @@ class PipelineManager:
         feature_names = (
             raw.get("case_feat_names")
             or raw.get("feature_names")
-            or GTF_ORDER
+            or DEFAULT_FEATURE_ORDER
         )
 
         normalised = {
