@@ -73,8 +73,6 @@ def seed_models(db: Session | None = None, models_root: Path = MODELS_ROOT) -> i
 
             db_model_config = _upsert_model_config(db, model_config)
             db.flush()
-            _seed_feature_importances(db, db_model_config, config_path.parent)
-            _seed_case_feature_contributions(db, db_model_config, config_path.parent)
             seeded_count += 1
 
         if owns_session:
@@ -305,8 +303,8 @@ def _seed_case_feature_contributions(
 
     with case_attention_path.open("r", encoding="utf-8", newline="") as csv_file:
         for row in csv.DictReader(csv_file):
-            case_id = _safe_int(row.get("Case ID"))
-            if case_id is None:
+            case_id = _normalise_case_id(row.get("Case ID"))
+            if not case_id:
                 continue
 
             document = db.scalar(
@@ -359,6 +357,15 @@ def _safe_int(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def _normalise_case_id(value: Any) -> str:
+    if value in (None, ""):
+        return ""
+    numeric_case_id = _safe_int(value)
+    if numeric_case_id is not None:
+        return str(numeric_case_id)
+    return str(value).strip()
 
 
 def _prediction_label(score: float | None) -> str | None:

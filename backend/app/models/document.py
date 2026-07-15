@@ -9,7 +9,7 @@ class DocumentMetadata(Base):
     document_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     
     # Unique Ref+Case ID for past ICS, NULL for new inferences
-    case_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    case_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     ref_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
