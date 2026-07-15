@@ -6,6 +6,21 @@ export default function CaseHeader({ data }) {
     return "User Inference";
   };
 
+  const formatInferenceTime = () => {
+    const milliseconds = Number(data.inference_time_ms);
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) {
+      return null;
+    }
+
+    if (milliseconds < 1000) {
+      return `${Math.round(milliseconds)} ms`;
+    }
+
+    return `${(milliseconds / 1000).toFixed(2)} s`;
+  };
+
+  const inferenceTime = formatInferenceTime();
+
   return (
     <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
       <div className="px-6 py-6 max-w-7xl mx-auto">
@@ -19,6 +34,18 @@ export default function CaseHeader({ data }) {
           <span className="text-sm text-slate-600">{data.institution}</span>
           <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
           <span className="text-sm font-medium text-slate-700">{data.uoa}</span>
+          {data.model_name && (
+            <>
+              <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
+              <span className="text-sm font-medium text-slate-700">Model: {data.model_name}</span>
+            </>
+          )}
+          {inferenceTime && (
+            <>
+              <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
+              <span className="text-sm font-medium text-slate-700">Inference time: {inferenceTime}</span>
+            </>
+          )}
         </div>
       </div>
     </header>

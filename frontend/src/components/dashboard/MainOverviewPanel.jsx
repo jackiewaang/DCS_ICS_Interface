@@ -129,10 +129,10 @@ export default function MainOverviewPanel({ data }) {
     );
   }
 
-  const confidence = data.model_prediction ?? 0;
-  const isHighImpact = data.prediction_label ? data.prediction_label === "High Impact" : confidence >= 0.5;
+  const predictionProbability = data.model_prediction ?? 0;
+  const isHighImpact = data.prediction_label ? data.prediction_label === "High Impact" : predictionProbability >= 0.5;
   const displayPrediction = data.prediction_label || (isHighImpact ? "High Impact" : "Low Impact");
-  const confidencePercentage = (isHighImpact ? confidence : (1 - confidence)) * 100;
+  const predictionProbabilityPercentage = predictionProbability * 100;
   const humanImpactLevel = data.ground_truth !== null && data.ground_truth !== undefined
     ? (data.ground_truth >= 3 ? "High Impact" : "Low Impact")
     : null;
@@ -144,7 +144,7 @@ export default function MainOverviewPanel({ data }) {
     ? `Human rating is applicable and indicates ${humanImpactLevel}${data.ground_truth !== null && data.ground_truth !== undefined ? ` (${data.ground_truth?.toFixed(1)} / 4.0 stars)` : ''}.`
     : 'Human rating is not available for this case.';
 
-  const summaryLeadBase = `This case is currently predicted as ${displayPrediction} with ${confidencePercentage.toFixed(0)}% confidence. ${humanRatingText}`;
+  const summaryLeadBase = `This case is currently predicted as ${displayPrediction} with a ${predictionProbabilityPercentage.toFixed(0)}% prediction probability. ${humanRatingText}`;
 
   const panelContent = (
     <div className="space-y-5">
@@ -152,7 +152,7 @@ export default function MainOverviewPanel({ data }) {
         <div className="rounded-lg border border-border bg-background/80 p-5 shadow-sm transition-shadow hover:bg-background hover:shadow-md">
           <div className="mb-4 flex items-center gap-2">
             <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">AI evaluation</span>
-            <DashboardHelp text="Model's classification of the case's impact level and its confidence." />
+            <DashboardHelp text="Model's classification of the case's impact level and the raw prediction probability." />
           </div>
 
           <span className={`block text-xl font-semibold ${isHighImpact ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -161,12 +161,12 @@ export default function MainOverviewPanel({ data }) {
 
           <div className="mt-4">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-xs font-semibold text-muted-foreground">Confidence</span>
-              <span className="text-sm font-semibold text-foreground">{confidencePercentage.toFixed(0)}%</span>
+              <span className="text-xs font-semibold text-muted-foreground">Prediction probability</span>
+              <span className="text-sm font-semibold text-foreground">{predictionProbabilityPercentage.toFixed(0)}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
-                style={{ width: `${confidencePercentage}%` }}
+                style={{ width: `${predictionProbabilityPercentage}%` }}
                 className={`h-full rounded-full transition-all duration-500 ${isHighImpact ? 'bg-primary' : 'bg-secondary-foreground/30'}`}
               />
             </div>

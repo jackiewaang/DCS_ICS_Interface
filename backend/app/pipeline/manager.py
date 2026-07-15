@@ -1,22 +1,265 @@
 from pathlib import Path
 from typing import Any
 
-from app.crud import GTF_ORDER
+import joblib
+import torch
+from sqlalchemy import select
+
 from app.database import SessionLocal
-from app.models.inference import ModelConfig
+from app.models.inference import ModelConfig, ModelFeatureImportance
 from app.pipeline.embedder import embedder
 from app.pipeline.feature_extractor import (
     ENTITY_LISTS_KEY,
     SPACY_ENTITY_LABELS,
     feature_extractor,
 )
-from app.services.inference_service import inference_engine
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_FEATURE_ORDER = [
+    "Flesch Reading Ease",
+    "Dale-Chall Readability Score",
+    "SMOG Index",
+    "Automated Readability Index",
+    "Sentiment (mean)",
+    "Sentiment (10th)",
+    "Sentiment (50th)",
+    "Sentiment (75th)",
+    "Sentiment (90th)",
+    "Number of organizations mentioned",
+    "Number of named individuals",
+    "Number of countries or regions mentioned",
+    "Word count",
+    "Paragraph count",
+    "PERSON",
+    "NORP",
+    "FAC",
+    "ORG",
+    "GPE",
+    "LOC",
+    "PRODUCT",
+    "EVENT",
+    "WORK_OF_ART",
+    "LAW",
+    "LANGUAGE",
+    "DATE",
+    "TIME",
+    "PERCENT",
+    "MONEY",
+    "QUANTITY",
+    "ORDINAL",
+    "CARDINAL",
+]
+
+
+class AttentionMIL(torch.nn.Module):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int = 128,
+        output_dim: int = 1,
+        mode: str = "classification",
+        case_feat_dim: int | None = None,
+        fusion_type: str = "gated",
+    ):
+        super().__init__()
+        self.mode = mode
+        self.case_feat_dim = case_feat_dim
+        self.fusion_type = fusion_type
+
+        self.attention = torch.nn.Sequential(
+            torch.nn.Linear(input_dim, hidden_dim),
+            torch.nn.Tanh(),
+            torch.nn.Linear(hidden_dim, 1),
+        )
+        self.sentence_proj = torch.nn.Linear(input_dim, hidden_dim)
+
+        if case_feat_dim is not None:
+            self.feature_gate = torch.nn.Sequential(
+                torch.nn.Linear(case_feat_dim, hidden_dim),
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim, case_feat_dim),
+            )
+            self.case_mlp = torch.nn.Sequential(
+                torch.nn.Linear(case_feat_dim, hidden_dim),
+                torch.nn.ReLU(),
+                torch.nn.Dropout(0.2),
+                torch.nn.Linear(hidden_dim, hidden_dim),
+            )
+
+        if case_feat_dim is None:
+            self.classifier = torch.nn.Sequential(
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim, output_dim),
+            )
+        elif fusion_type == "gated":
+            self.gate = torch.nn.Sequential(
+                torch.nn.Linear(hidden_dim * 2, hidden_dim),
+                torch.nn.Sigmoid(),
+            )
+            self.classifier = torch.nn.Sequential(
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim, output_dim),
+            )
+        else:
+            self.classifier = torch.nn.Sequential(
+                torch.nn.ReLU(),
+                torch.nn.Linear(hidden_dim * 2, output_dim),
+            )
+
+    def encode_text(self, embeddings: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        attention_scores = torch.softmax(self.attention(embeddings), dim=0)
+        text_repr = torch.sum(attention_scores * embeddings, dim=0, keepdim=True)
+        return self.sentence_proj(text_repr), attention_scores
+
+    def encode_features(self, case_features: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        gate_logits = self.feature_gate(case_features)
+        feature_gates = torch.sigmoid(gate_logits)
+        gated_features = feature_gates * case_features
+        return self.case_mlp(gated_features), feature_gates
+
+    def fuse(
+        self,
+        text_repr: torch.Tensor,
+        feature_repr: torch.Tensor | None,
+    ) -> torch.Tensor:
+        if feature_repr is None:
+            return text_repr
+
+        if text_repr.dim() == 1:
+            text_repr = text_repr.unsqueeze(0)
+        if feature_repr.dim() == 1:
+            feature_repr = feature_repr.unsqueeze(0)
+
+        if self.fusion_type == "gated":
+            fusion = torch.cat([text_repr, feature_repr], dim=-1)
+            gate = self.gate(fusion)
+            fused = gate * text_repr + (1 - gate) * feature_repr
+        else:
+            fused = torch.cat([text_repr, feature_repr], dim=-1)
+
+        return fused.squeeze(0)
+
+    def predict_from_repr(self, fused_repr: torch.Tensor) -> torch.Tensor:
+        output = self.classifier(fused_repr)
+        if self.mode == "classification":
+            return torch.sigmoid(output)
+        return output
+
+    def forward(
+        self,
+        embeddings: torch.Tensor,
+        case_features: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, torch.Tensor, torch.Tensor]:
+        eps = 1e-8
+        text_repr, attention_scores = self.encode_text(embeddings)
+
+        if case_features is not None:
+            feature_repr, feature_gates = self.encode_features(case_features)
+        else:
+            feature_repr = None
+            feature_gates = None
+
+        fused = self.fuse(text_repr, feature_repr)
+        prediction = self.predict_from_repr(fused)
+
+        if feature_repr is not None:
+            zero_feature = torch.zeros_like(feature_repr)
+            text_only = self.predict_from_repr(self.fuse(text_repr, zero_feature))
+
+            zero_text = torch.zeros_like(text_repr)
+            feature_only = self.predict_from_repr(self.fuse(zero_text, feature_repr))
+
+            text_delta = torch.abs(prediction - feature_only)
+            feature_delta = torch.abs(prediction - text_only)
+            total_delta = torch.abs(text_delta) + torch.abs(feature_delta) + eps
+
+            text_importance = (text_delta / total_delta).clamp(0, 1)
+            feature_importance = (feature_delta / total_delta).clamp(0, 1)
+        else:
+            text_importance = torch.tensor(1.0, device=embeddings.device)
+            feature_importance = torch.tensor(0.0, device=embeddings.device)
+
+        return (
+            prediction,
+            attention_scores,
+            feature_gates,
+            text_importance,
+            feature_importance,
+        )
+
+
+class ModelRunner:
+    def __init__(self):
+        self.loaded_models: dict[Any, AttentionMIL] = {}
+        self.loaded_scalers: dict[Any, Any] = {}
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def run_inference(
+        self,
+        config: dict[str, Any],
+        embeddings: list[list[float]],
+        ordered_features: list[float] | None = None,
+    ) -> dict[str, Any]:
+        model, scaler = self._get_assets(config)
+
+        feature_tensor = None
+        if ordered_features:
+            features = scaler.transform([ordered_features])[0] if scaler else ordered_features
+            feature_tensor = torch.tensor(features, dtype=torch.float32).to(self.device)
+
+        embedding_tensor = torch.tensor(embeddings, dtype=torch.float32).to(self.device)
+
+        with torch.no_grad():
+            prediction, attention, gates, text_importance, feature_importance = model(
+                embedding_tensor,
+                case_features=feature_tensor,
+            )
+
+        score = round(float(prediction.item()), 4)
+        return {
+            "score": score,
+            "label": "High Impact" if score >= 0.5 else "Low Impact",
+            "attention": attention.detach().view(-1).cpu().numpy().tolist(),
+            "feature_gates": (
+                gates.detach().view(-1).cpu().numpy().tolist()
+                if gates is not None
+                else []
+            ),
+            "narrative_contribution": round(float(text_importance.item()), 4),
+            "feature_contribution": round(float(feature_importance.item()), 4),
+        }
+
+    def _get_assets(self, config: dict[str, Any]) -> tuple[AttentionMIL, Any]:
+        config_id = config["config_id"]
+        if config_id in self.loaded_models:
+            return self.loaded_models[config_id], self.loaded_scalers.get(config_id)
+
+        scaler = joblib.load(config["scaler_path"]) if config.get("scaler_path") else None
+        feature_dim = config["feature_dim"] if config.get("use_features") else None
+
+        model = AttentionMIL(
+            input_dim=config["input_dim"],
+            hidden_dim=config.get("hidden_dim", 128),
+            case_feat_dim=feature_dim,
+            fusion_type=config.get("fusion_type", "gated"),
+            mode=config.get("task", "classification"),
+        )
+
+        checkpoint = torch.load(config["checkpoint_path"], map_location=self.device)
+        state_dict = checkpoint.get("model_state_dict", checkpoint)
+        model.load_state_dict(state_dict)
+        model.to(self.device).eval()
+
+        self.loaded_models[config_id] = model
+        self.loaded_scalers[config_id] = scaler
+        return model, scaler
 
 
 class PipelineManager:
+    def __init__(self, model_runner: ModelRunner | None = None):
+        self.model_runner = model_runner or ModelRunner()
+
     def run_inference(
         self,
         sections: dict[str, str] | str,
@@ -45,7 +288,7 @@ class PipelineManager:
         if model_config["input_dim"] is None:
             model_config["input_dim"] = len(embeddings[0])
 
-        prediction = inference_engine.run_inference(
+        prediction = self.model_runner.run_inference(
             model_config,
             embeddings,
             ordered_features if model_config["use_features"] else None,
@@ -72,6 +315,7 @@ class PipelineManager:
             "ordered_features": ordered_features,
             "feature_names": model_config["feature_names"],
             "feature_gates": prediction.get("feature_gates", []),
+            "global_importance": self._get_global_importance(model_config["config_id"]),
             "narrative_contribution": prediction.get("narrative_contribution"),
             "feature_contribution": prediction.get("feature_contribution"),
             "model": {
@@ -92,6 +336,24 @@ class PipelineManager:
             if config is None:
                 raise ValueError(f"Model configuration {config_id} was not found.")
             return config
+
+    def _get_global_importance(self, config_id: int | str) -> dict[str, float]:
+        try:
+            numeric_config_id = int(config_id)
+        except (TypeError, ValueError):
+            return {}
+
+        with SessionLocal() as db:
+            rows = db.scalars(
+                select(ModelFeatureImportance).where(
+                    ModelFeatureImportance.config_id == numeric_config_id
+                )
+            ).all()
+
+            return {
+                row.feature_name: row.mean_permutation_importance
+                for row in rows
+            }
 
     def _normalise_sections(self, sections: dict[str, str] | str) -> tuple[str, str, str]:
         if isinstance(sections, str):
@@ -123,7 +385,7 @@ class PipelineManager:
         feature_names = (
             raw.get("case_feat_names")
             or raw.get("feature_names")
-            or GTF_ORDER
+            or DEFAULT_FEATURE_ORDER
         )
 
         normalised = {
