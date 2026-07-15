@@ -1,8 +1,13 @@
 from typing import Any, Dict
+from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class ModelConfig(Base):
     __tablename__ = "model_configs"
@@ -80,6 +85,12 @@ class Inference(Base):
     score: Mapped[float | None] = mapped_column(Float, nullable=True)
     true_label: Mapped[float | None] = mapped_column(Float, nullable=True)
     prediction_label: Mapped[str | None] = mapped_column(String, nullable=True) # High or Low
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        server_default=func.now(),
+        nullable=False,
+    )
     
     narrative_contribution: Mapped[float | None] = mapped_column(Float, nullable=True)
     feature_contribution: Mapped[float | None] = mapped_column(Float, nullable=True)

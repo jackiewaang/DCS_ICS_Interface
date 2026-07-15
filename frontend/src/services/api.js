@@ -32,6 +32,7 @@ const MOCK_CASES = [
   {
     inference_id: "mock-9821",
     document_id: 4187,
+    created_at: "2026-07-15T12:00:00Z",
     case_id: 140219,
     ref_year: 2021,
     title: "Reducing Urban Flood Risk Through Community-Led Forecasting",
@@ -237,6 +238,7 @@ function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
   return {
     inference_id: output.inference_id || `draft-${Date.now()}`,
     document_id: output.document_id || "draft",
+    created_at: output.created_at || new Date().toISOString(),
     title: draft.title || "Untitled inference",
     institution: draft.institution || "Draft upload",
     uoa: draft.uoa || "User supplied case",
@@ -283,7 +285,7 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE}/analysis/models`);
       return handleResponse(response);
-    } catch (error) {
+    } catch {
       return getSampleConfigs();
     }
   },
@@ -303,7 +305,7 @@ export const api = {
         body: formData,
       });
       return handleResponse(response);
-    } catch (error) {
+    } catch {
       return loadSampleCaseById("100");
     }
   },
@@ -356,7 +358,7 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE}/cases/inference/${inferenceId}`);
       return handleResponse(response);
-    } catch (error) {
+    } catch {
       return loadSampleCaseById(inferenceId);
     }
   },
@@ -383,7 +385,7 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE}/cases/?${params.toString()}`);
       return handleResponse(response);
-    } catch (error) {
+    } catch {
       return getSampleCases(query, uoa);
     }
   },
@@ -396,7 +398,7 @@ export const api = {
     try {
       const response = await fetch(`${API_BASE}/cases/${documentId}`);
       return handleResponse(response);
-    } catch (error) {
+    } catch {
       return loadSampleCaseById(documentId);
     }
   }

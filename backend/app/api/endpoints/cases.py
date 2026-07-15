@@ -27,6 +27,7 @@ def search_cases(q: str = None, uoa: str = None):
                 Inference.score.label("model_prediction"),
                 Inference.prediction_label.label("model_label"),
                 Inference.true_label.label("true_label"),
+                Inference.created_at,
                 ModelConfig.name.label("model_name"),
             )
             .join(DocumentMetadata, Inference.document_id == DocumentMetadata.document_id)
@@ -47,8 +48,16 @@ def search_cases(q: str = None, uoa: str = None):
         if uoa:
             stmt = stmt.where(DocumentMetadata.uoa == uoa)
 
-        stmt = stmt.order_by(Inference.inference_id.desc())
+        stmt = stmt.order_by(Inference.created_at.desc(), Inference.inference_id.desc())
         return [dict(row) for row in db.execute(stmt).mappings().all()]
+
+
+@router.get("/latest")
+def read_latest_inference():
+    data = _get_latest_inference_details()
+    if not data:
+        raise HTTPException(status_code=404, detail="No analysis results found")
+    return data
 
 
 @router.get("/inference/{inference_id}")
@@ -124,6 +133,27 @@ def _get_inference_details(inference_id: int) -> dict | None:
         return _parse_feature_blobs(case)
 
 
+def _get_latest_inference_details() -> dict | None:
+    with SessionLocal() as db:
+        inference = db.scalar(
+            select(Inference)
+            .options(
+                joinedload(Inference.document).joinedload(DocumentMetadata.features),
+                joinedload(Inference.model_config),
+            )
+            .order_by(Inference.created_at.desc(), Inference.inference_id.desc())
+            .limit(1)
+        )
+
+        if not inference:
+            return None
+
+        case = _document_payload(inference.document)
+        case.update(_inference_payload(inference))
+        case["heatmap"] = _get_heatmap_for_inference(inference.inference_id)
+        return _parse_feature_blobs(case)
+
+
 def _get_case_by_id(document_id: int) -> dict | None:
     with SessionLocal() as db:
         inference = db.scalar(
@@ -133,7 +163,7 @@ def _get_case_by_id(document_id: int) -> dict | None:
                 joinedload(Inference.model_config),
             )
             .where(Inference.document_id == document_id)
-            .order_by(Inference.inference_id.desc())
+            .order_by(Inference.created_at.desc(), Inference.inference_id.desc())
             .limit(1)
         )
 
@@ -159,6 +189,7 @@ def _get_case_by_id(document_id: int) -> dict | None:
                 "model_prediction": None,
                 "model_label": None,
                 "true_label": None,
+                "created_at": None,
                 "model_name": None,
                 "feature_attributions": {},
                 "narrative_contribution": None,
@@ -198,6 +229,7 @@ def _inference_payload(inference: Inference) -> dict:
         "model_prediction": inference.score,
         "model_label": inference.prediction_label,
         "true_label": inference.true_label,
+        "created_at": inference.created_at.isoformat() if inference.created_at else None,
         "model_name": inference.model_config.name if inference.model_config else None,
         "narrative_contribution": inference.narrative_contribution,
         "feature_contribution": inference.feature_contribution,
