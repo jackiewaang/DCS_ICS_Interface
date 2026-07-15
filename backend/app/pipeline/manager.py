@@ -3,7 +3,7 @@ from typing import Any
 
 from app.crud import GTF_ORDER
 from app.database import SessionLocal
-from app.models.inference import ModelConfig
+from app.models.inference import ModelConfig, ModelFeatureImportance
 from app.pipeline.embedder import embedder
 from app.pipeline.feature_extractor import (
     ENTITY_LISTS_KEY,
@@ -72,6 +72,7 @@ class PipelineManager:
             "ordered_features": ordered_features,
             "feature_names": model_config["feature_names"],
             "feature_gates": prediction.get("feature_gates", []),
+            "global_importance": self._get_global_importance(model_config["config_id"]),
             "narrative_contribution": prediction.get("narrative_contribution"),
             "feature_contribution": prediction.get("feature_contribution"),
             "model": {
@@ -92,6 +93,24 @@ class PipelineManager:
             if config is None:
                 raise ValueError(f"Model configuration {config_id} was not found.")
             return config
+
+    def _get_global_importance(self, config_id: int | str) -> dict[str, float]:
+        try:
+            numeric_config_id = int(config_id)
+        except (TypeError, ValueError):
+            return {}
+
+        with SessionLocal() as db:
+            rows = db.scalars(
+                select(ModelFeatureImportance).where(
+                    ModelFeatureImportance.config_id == numeric_config_id
+                )
+            ).all()
+
+            return {
+                row.feature_name: row.mean_permutation_importance
+                for row in rows
+            }
 
     def _normalise_sections(self, sections: dict[str, str] | str) -> tuple[str, str, str]:
         if isinstance(sections, str):

@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 
 from app.database import SessionLocal
 from app.models.document import DocumentFeatures, DocumentMetadata
-from app.models.inference import Attention, Inference, ModelConfig
+from app.models.inference import Attention, Inference, ModelConfig, ModelFeatureImportance
 
 GTF_ORDER = [
     "Flesch Reading Ease", "Dale-Chall Readability Score", "SMOG Index", "Automated Readability Index",
@@ -45,6 +45,31 @@ def _parse_feature_blobs(case_dict: dict) -> dict:
     case_dict["features"] = json.loads(case_dict.get("features_json") or "{}")
     case_dict["entities"] = json.loads(case_dict.get("entities_json") or "{}")
     return case_dict
+
+
+def _parse_json_object(value: str | None) -> dict:
+    if not value:
+        return {}
+
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError:
+        return {}
+
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _global_importance_payload(db, config_id: int) -> dict:
+    rows = db.scalars(
+        select(ModelFeatureImportance).where(
+            ModelFeatureImportance.config_id == config_id
+        )
+    ).all()
+
+    return {
+        row.feature_name: row.mean_permutation_importance
+        for row in rows
+    }
 
 
 def get_cases(search_query: str = None, uoa: str = None):
@@ -107,6 +132,8 @@ def get_inference_details(inference_id: int):
                 "true_label": inference.true_label,
                 "model_name": inference.model_config.name,
                 "input_granularity": inference.model_config.input_granularity,
+                "feature_attributions": _parse_json_object(inference.feature_attributions),
+                "global_importance": _global_importance_payload(db, inference.config_id),
             }
         )
         _parse_feature_blobs(case_dict)
@@ -149,6 +176,8 @@ def get_case_by_id(document_id: int):
                     "model_label": inference.prediction_label,
                     "true_label": inference.true_label,
                     "model_name": inference.model_config.name,
+                    "feature_attributions": _parse_json_object(inference.feature_attributions),
+                    "global_importance": _global_importance_payload(db, inference.config_id),
                 }
             )
             _parse_feature_blobs(case_dict)

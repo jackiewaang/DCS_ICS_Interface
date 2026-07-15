@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import SearchHeader from '@/components/SearchHeader';
 import CaseHeader from '@/components/CaseHeader';
-import { api } from '@/services/api'; // Centralized API service
+import { api } from '@/services/api'; 
+
 import MainOverviewPanel from '@/components/dashboard/MainOverviewPanel';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
 import HeatmapPanel from '@/components/dashboard/HeatmapPanel';
@@ -17,6 +18,46 @@ const TABS = [
   { id: 'entities', label: 'Entities' },
 ];
 
+function normalizeImportanceMap(data) {
+  const candidates = [
+    data?.global_importance,
+    data?.mean_permutation_importance,
+    data?.feature_importances,
+  ];
+  const source = candidates.find((candidate) => (
+    Array.isArray(candidate) ? candidate.length > 0 : candidate && Object.keys(candidate).length > 0
+  )) || {};
+
+  if (Array.isArray(source)) {
+    return Object.fromEntries(
+      source
+        .map((item) => [
+          item.feature_name || item.feature || item.name,
+          Number(item.mean_permutation_importance ?? item.importance ?? item.value ?? 0),
+        ])
+        .filter(([name]) => Boolean(name))
+    );
+  }
+
+  return Object.fromEntries(
+    Object.entries(source).map(([name, value]) => [
+      name,
+      Number(value?.mean_permutation_importance ?? value?.importance ?? value ?? 0),
+    ])
+  );
+}
+
+function normalizeDashboardData(data) {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    ...data,
+    global_importance: normalizeImportanceMap(data),
+  };
+}
+
 const Dashboard = ({ initialCaseId, onClearInitial }) => {
   const [caseData, setCaseData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -30,9 +71,8 @@ const Dashboard = ({ initialCaseId, onClearInitial }) => {
     setActiveTab('main');
     setIsLoading(true);
     try {
-      // We are now fetching a specific INFERENCE
       const data = await api.getInferenceById(id);
-      setCaseData(data);
+      setCaseData(normalizeDashboardData(data));
     } catch (error) {
       console.error("Error loading analysis:", error);
     } finally {
@@ -42,7 +82,6 @@ const Dashboard = ({ initialCaseId, onClearInitial }) => {
 
   useEffect(() => {
     const init = async () => {
-      // If we just uploaded a new file, the backend returned the NEW inference_id
       if (initialCaseId && lastHandledInitialCaseId.current !== initialCaseId) {
         lastHandledInitialCaseId.current = initialCaseId;
         await handleLoadCase(initialCaseId);
@@ -51,16 +90,20 @@ const Dashboard = ({ initialCaseId, onClearInitial }) => {
       }
 
       if (!caseData) {
-        const list = await api.getCases(); // This now returns inference-centric rows
-        if (list && list.length > 0) {
-          await handleLoadCase(list[0].inference_id);
+        setIsLoading(true);
+        try {
+          const data = await api.getLatestInference();
+          setCaseData(normalizeDashboardData(data));
+        } catch (error) {
+          console.error("Error loading latest analysis:", error);
+        } finally {
+          setIsLoading(false);
         }
       }
     };
     init();
   }, [initialCaseId, caseData, onClearInitial]);
 
-  // Loading state (Empty shell)
   if (isLoading && !caseData) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-background text-foreground">
@@ -76,7 +119,6 @@ const Dashboard = ({ initialCaseId, onClearInitial }) => {
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
-      {/* Search Bar - now triggers handleLoadCase via document_id */}
       <SearchHeader onCaseSelect={(id) => handleLoadCase(id)} />
 
       <div className="w-full flex-1 bg-background/80 transition-all duration-300">

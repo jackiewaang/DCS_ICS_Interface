@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { api } from "./services/api";
-import { Search, Upload, Terminal, LayoutDashboard, ChevronLeft, ChevronRight, Settings2, Layers } from "lucide-react";
+import { Search, Upload, Terminal, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Settings2 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import UploadPage from "./pages/UploadPage";
 import PromptLab from "./pages/PromptLab";
@@ -21,6 +21,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState("browse");
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(true);
   const [models, setModels] = useState([]);
   const [activeConfigId, setActiveConfigId] = useState("");
 
@@ -85,91 +86,105 @@ export default function App() {
           />
         </nav>
 
-        <div className={`mt-auto border-t border-slate-600/50 p-5 space-y-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0' : 'opacity-100'}`}>
-          <div className="flex items-center gap-2 text-slate-300">
-            <Settings2 size={16} />
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-300">
-              Inference Settings
-            </h3>
-          </div>
+        <div className={`mt-auto border-t border-slate-600/50 p-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0 overflow-hidden' : 'opacity-100'}`}>
+          <button
+            type="button"
+            onClick={() => setIsSettingsExpanded((current) => !current)}
+            aria-expanded={isSettingsExpanded}
+            className="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-slate-300"
+          >
+            <span className="flex items-center gap-2">
+              <Settings2 size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+                Inference Settings
+              </span>
+            </span>
+            {isSettingsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
 
-          <div className="space-y-2">
-            <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Active engine</Label>
-            <Select value={activeConfigId} onValueChange={setActiveConfigId}>
-              <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-slate-100 h-9 text-xs focus:ring-slate-400">
-                <SelectValue placeholder="Select Model" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-600 text-slate-100 shadow-lg">
-                {models.map((model) => (
-                  <SelectItem key={model.config_id} value={model.config_id.toString()} className="text-xs focus:bg-slate-700">
-                    {model.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ${isSettingsExpanded ? 'mt-5 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'}`}>
+            <div className="min-h-0 overflow-hidden">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Active engine</Label>
+                  <Select value={activeConfigId} onValueChange={setActiveConfigId}>
+                    <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-slate-100 h-9 text-xs focus:ring-slate-400">
+                      <SelectValue placeholder="Select Model" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600 text-slate-100 shadow-lg">
+                      {models.map((model) => (
+                        <SelectItem key={model.config_id} value={model.config_id.toString()} className="text-xs focus:bg-slate-700">
+                          {model.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <Separator className="bg-slate-600/50" />
+                <Separator className="bg-slate-600/50" />
 
-          <div className="space-y-3">
-            <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Enabled features</Label>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="features" 
-                  checked={activeConfig?.use_features === 1} 
-                  disabled 
-                  className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
-                />
-                <label className="text-xs text-slate-300 font-medium leading-none">
-                  Linguistic GTFs
-                </label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="spacy" 
-                  checked={activeConfig?.input_granularity === "sentence"} 
-                  disabled 
-                  className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
-                />
-                <label className="text-xs text-slate-300 font-medium leading-none">
-                  Attention Heatmap
-                </label>
+                <div className="space-y-3">
+                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Enabled features</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="features" 
+                        checked={activeConfig?.use_features === 1} 
+                        disabled 
+                        className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
+                      />
+                      <label className="text-xs text-slate-300 font-medium leading-none">
+                        Linguistic GTFs
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id="spacy" 
+                        checked={activeConfig?.input_granularity === "sentence"} 
+                        disabled 
+                        className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
+                      />
+                      <label className="text-xs text-slate-300 font-medium leading-none">
+                        Attention Heatmap
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator className="bg-slate-600/50" />
+
+                <div className="space-y-3">
+                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Input resolution</Label>
+                  <RadioGroup 
+                    value={activeConfig?.input_granularity === "full_text" ? "document" : "sentence"} 
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem 
+                        value="document" 
+                        id="full" 
+                        disabled 
+                        className="border-slate-500 text-slate-200 disabled:opacity-50" 
+                      />
+                      <Label htmlFor="full" className="text-xs text-slate-300 font-medium cursor-default">
+                        Document Level
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem 
+                        value="sentence" 
+                        id="sentence" 
+                        disabled 
+                        className="border-slate-500 text-slate-200 disabled:opacity-50" 
+                      />
+                      <Label htmlFor="sentence" className="text-xs text-slate-300 font-medium cursor-default">
+                        Sentence Level (MIL)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
             </div>
-          </div>
-
-          <Separator className="bg-slate-600/50" />
-
-          <div className="space-y-3">
-            <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Input resolution</Label>
-            <RadioGroup 
-              value={activeConfig?.input_granularity === "full_text" ? "document" : "sentence"} 
-              className="space-y-2"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem 
-                  value="document" 
-                  id="full" 
-                  disabled 
-                  className="border-slate-500 text-slate-200 disabled:opacity-50" 
-                />
-                <Label htmlFor="full" className="text-xs text-slate-300 font-medium cursor-default">
-                  Document Level
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem 
-                  value="sentence" 
-                  id="sentence" 
-                  disabled 
-                  className="border-slate-500 text-slate-200 disabled:opacity-50" 
-                />
-                <Label htmlFor="sentence" className="text-xs text-slate-300 font-medium cursor-default">
-                  Sentence Level (MIL)
-                </Label>
-              </div>
-            </RadioGroup>
           </div>
         </div>
       </aside>

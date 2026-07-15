@@ -1,11 +1,151 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:11005/api";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 const USE_SAMPLE_DATA = import.meta.env.VITE_USE_SAMPLE_DATA === "true";
 
-const SAMPLE_INDEX_URL = "/index.json";
-const SAMPLE_CASES_PATH = "/data/case_studies";
+const MOCK_CONFIGS = [
+  {
+    config_id: 1,
+    name: "Qwen3-Embedding-4B Quantile MIL Fusion",
+    emb_model: "Qwen3-Embedding-4B",
+    run_mode: "classification",
+    fusion_type: "gated",
+    normalise_emb: true,
+    normalise_case_feats: true,
+    label_config: { labels: ["Low Impact", "High Impact"] },
+    use_features: 1,
+    input_granularity: "sentence",
+  },
+  {
+    config_id: 2,
+    name: "all-roberta-large-v1 Full Text",
+    emb_model: "all-roberta-large-v1",
+    run_mode: "classification",
+    fusion_type: "none",
+    normalise_emb: true,
+    normalise_case_feats: false,
+    label_config: { labels: ["Low Impact", "High Impact"] },
+    use_features: 0,
+    input_granularity: "full_text",
+  },
+];
 
-const sampleCaseCache = new Map();
-let sampleIndexPromise = null;
+const MOCK_CASES = [
+  {
+    inference_id: "mock-9821",
+    document_id: 4187,
+    case_id: 140219,
+    ref_year: 2021,
+    title: "Reducing Urban Flood Risk Through Community-Led Forecasting",
+    institution: "Northbridge University",
+    uoa: "UOA 14 - Geography and Environmental Studies",
+    status: "analysed",
+    ground_truth: 3.8,
+    gpa: 3.8,
+    true_label: 1,
+    model_name: "Qwen3-Embedding-4B Quantile MIL Fusion",
+    input_granularity: "sentence",
+    model_prediction: 0.87,
+    prediction_label: "High Impact",
+    model_label: "High Impact",
+    narrative_contribution: 0.68,
+    feature_contribution: 0.32,
+    inference_time_ms: 1240,
+    sections: {
+      summary: "Research on flood forecasting and participatory planning was translated into decision tools for city councils, insurers, and emergency responders.",
+      research: "The underpinning research combined hydrological modelling, household vulnerability mapping, and social science evaluation of local warning systems.",
+      impact: "The programme changed flood-preparedness protocols across regional authorities, reduced repeat losses for exposed households, and informed national resilience guidance.",
+    },
+    heatmap: [
+      {
+        sentence_text: "The forecasting framework was adopted by three city councils and used to redesign emergency response thresholds for more than 120,000 residents.",
+        attention_score: 0.1568,
+      },
+      {
+        sentence_text: "Insurance partners reported a 22 percent reduction in repeat claims after household-level warnings were introduced in high-risk neighbourhoods.",
+        attention_score: 0.1324,
+      },
+      {
+        sentence_text: "The Environment Agency cited the research in revised national guidance for surface-water flood response planning.",
+        attention_score: 0.1187,
+      },
+      {
+        sentence_text: "Community workshops helped residents interpret risk maps and prepare evacuation plans before seasonal rainfall peaks.",
+        attention_score: 0.0972,
+      },
+      {
+        sentence_text: "Local authorities used the dashboard during incident exercises to coordinate shelters, road closures, and public messaging.",
+        attention_score: 0.0845,
+      },
+      {
+        sentence_text: "The research team published peer-reviewed work on model calibration and social acceptance of alert thresholds.",
+        attention_score: 0.0608,
+      },
+      {
+        sentence_text: "Project documentation was archived in the university repository and made available to regional planning officers.",
+        attention_score: 0.0419,
+      },
+      {
+        sentence_text: "The project began with a pilot study in two catchments before expanding to the regional partnership.",
+        attention_score: 0.0335,
+      },
+    ],
+    features: {
+      "Flesch Reading Ease": 34.7,
+      "Dale-Chall Readability Score": 9.64,
+      "SMOG Index": 15.2,
+      "Automated Readability Index": 16.1,
+      "Sentiment (mean)": 0.18,
+      "Sentiment (10th)": -0.28,
+      "Sentiment (50th)": 0.11,
+      "Sentiment (75th)": 0.42,
+      "Sentiment (90th)": 0.76,
+      "Word count": 1860,
+      "Paragraph count": 12,
+      ORG: 15,
+      MONEY: 4,
+      PERSON: 5,
+      DATE: 11,
+    },
+    feature_attributions: {
+      "Flesch Reading Ease": 0.096,
+      "Dale-Chall Readability Score": 0.141,
+      "SMOG Index": 0.087,
+      "Automated Readability Index": 0.103,
+      "Sentiment (mean)": 0.058,
+      "Sentiment (10th)": 0.025,
+      "Sentiment (50th)": 0.034,
+      "Sentiment (75th)": 0.073,
+      "Sentiment (90th)": 0.119,
+      "Word count": 0.082,
+      "Paragraph count": 0.045,
+      ORG: 0.128,
+      MONEY: 0.111,
+      PERSON: 0.049,
+      DATE: 0.053,
+    },
+    global_importance: {
+      "Flesch Reading Ease": 0.71,
+      "Dale-Chall Readability Score": 0.88,
+      "SMOG Index": 0.64,
+      "Automated Readability Index": 0.69,
+      "Sentiment (mean)": 0.45,
+      "Sentiment (10th)": 0.22,
+      "Sentiment (50th)": 0.31,
+      "Sentiment (75th)": 0.52,
+      "Sentiment (90th)": 0.79,
+      "Word count": 0.57,
+      "Paragraph count": 0.36,
+      ORG: 0.74,
+      MONEY: 0.62,
+      PERSON: 0.41,
+      DATE: 0.49,
+    },
+    entities: {
+      ORG: ["Environment Agency", "Northbridge City Council", "Calder Resilience Partnership", "Yorkshire Water", "Flood Re", "Cabinet Office"],
+      MONEY: ["GBP 4.2 million", "22 percent reduction", "GBP 780,000 avoided losses", "120,000 residents"],
+      PERSON: ["Professor Aisha Rahman", "Dr. Oliver Chen", "Maria Patel", "James Whitfield", "Helen Morris"],
+    },
+  },
+];
 
 async function handleResponse(response) {
     if (!response.ok) {
@@ -15,198 +155,122 @@ async function handleResponse(response) {
     return response.json();
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP Error: ${response.status}`);
-  }
-  return response.json();
-}
-
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
 }
 
-function normalizePrediction(prediction = {}) {
-  const confidence = Number(prediction.confidence ?? 0.5);
-  const label = String(prediction.label || "").toLowerCase().includes("high")
-    ? "High Impact"
-    : "Low Impact";
-
-  return {
-    model_prediction: confidence,
-    prediction_label: label,
-  };
-}
-
-function countItems(values = []) {
-  return Array.isArray(values) ? values.length : 0;
-}
-
-function buildSampleFeatureMaps(sample = {}) {
-  const readability = sample.readability_metrics || {};
-  const sentiment = sample.sentiment_analysis || {};
-  const ner = sample["SpaCy NER"] || {};
-  const wordCount = sample.structure?.word_count ?? 0;
-
-  const features = {
-    "Flesch Reading Ease": readability.flesch_reading_ease,
-    "Automated Readability Index": readability.automated_readability_index,
-    "Dale-Chall Readability Score": readability.dale_chall_readability_score,
-    "SMOG Index": readability.smog_index,
-    "Sentiment (mean)": sentiment["sentiment (mean)"],
-    "Sentiment (75th)": sentiment["sentiment (75th)"],
-    "Sentiment (90th)": sentiment["sentiment (90th)"],
-    "Word count": wordCount,
-    DATE: countItems(ner.DATE),
-    MONEY: countItems(ner.MONEY),
-    ORG: countItems(ner.ORG),
-    PERSON: countItems(ner.PERSON),
-  };
-
-  const globalImportance = {
-    "Flesch Reading Ease": 0.95,
-    "Automated Readability Index": 0.9,
-    "Dale-Chall Readability Score": 0.82,
-    "SMOG Index": 0.78,
-    "Word count": 0.68,
-    "Sentiment (mean)": 0.62,
-    "Sentiment (90th)": 0.56,
-    "Sentiment (75th)": 0.5,
-    ORG: 0.42,
-    DATE: 0.34,
-    MONEY: 0.3,
-    PERSON: 0.24,
-  };
-
-  const featureAttributions = Object.fromEntries(
-    Object.entries(globalImportance).map(([name, importance]) => [
-      name,
-      Number((importance * 0.65).toFixed(3)),
-    ])
-  );
-
-  return { features, globalImportance, featureAttributions };
-}
-
-function normalizeSampleCase(sample, inferenceId) {
-  const caseId = String(sample.case_id || inferenceId || sample.id || "sample");
-  const title = cleanText(sample.metadata?.title) || `Sample Case ${caseId}`;
-  const institution = cleanText(sample.metadata?.institution) || "Sample archive";
-  const uoa = cleanText(sample.metadata?.uoa) || "Sample case";
-  const prediction = normalizePrediction(sample.predictions?.mil_fusion);
-  const featureMaps = buildSampleFeatureMaps(sample);
-
-  return {
-    inference_id: inferenceId || `sample-${caseId}`,
-    document_id: caseId,
-    title,
-    institution,
-    uoa,
-    model_name: "Sample MIL Fusion",
-    ground_truth: null,
-    narrative_contribution: 0.75,
-    feature_contribution: 0.25,
-    heatmap: (sample.text_analysis || []).map((item) => ({
-      sentence_text: cleanText(item.text),
-      attention_score: Number(item.weight || 0),
-    })),
-    entities: {
-      ORG: sample["SpaCy NER"]?.ORG || [],
-      MONEY: sample["SpaCy NER"]?.MONEY || [],
-      PERSON: sample["SpaCy NER"]?.PERSON || [],
-    },
-    ...prediction,
-    ...featureMaps,
-  };
-}
-
-async function loadSampleIndex() {
-  if (!sampleIndexPromise) {
-    sampleIndexPromise = fetchJson(SAMPLE_INDEX_URL).catch(() => []);
-  }
-
-  return sampleIndexPromise;
-}
-
 async function loadSampleCaseById(caseId) {
-  const normalizedId = String(caseId).replace(/^sample-/, "");
-
-  if (sampleCaseCache.has(normalizedId)) {
-    return sampleCaseCache.get(normalizedId);
-  }
-
-  const sample = await fetchJson(`${SAMPLE_CASES_PATH}/${normalizedId}.json`);
-  const normalized = normalizeSampleCase(sample, `sample-${normalizedId}`);
-  sampleCaseCache.set(normalizedId, normalized);
-  return normalized;
+  const normalizedId = String(caseId).replace(/^mock-/, "");
+  return MOCK_CASES.find((item) => {
+    return (
+      String(item.inference_id) === String(caseId) ||
+      String(item.document_id) === normalizedId ||
+      String(item.case_id) === normalizedId
+    );
+  }) || MOCK_CASES[0];
 }
 
 async function loadSampleCases(limit = 10) {
-  const index = await loadSampleIndex();
-  const ids = index.slice(0, limit).map((item) => item.id);
-  const cases = await Promise.all(ids.map((id) => loadSampleCaseById(id).catch(() => null)));
-  return cases.filter(Boolean);
+  return MOCK_CASES.slice(0, limit);
 }
 
 async function getSampleConfigs() {
-  return [
-    {
-      config_id: 1,
-      name: "Sample MIL Fusion",
-      use_features: 1,
-      input_granularity: "sentence",
-    },
-    {
-      config_id: 2,
-      name: "Sample Full Text",
-      use_features: 0,
-      input_granularity: "full_text",
-    },
-    {
-      config_id: 3,
-      name: "Sample Semantic Only",
-      use_features: 0,
-      input_granularity: "sentence",
-    },
-  ];
+  return MOCK_CONFIGS;
 }
 
-function buildSampleSearchResults(index, query = "", uoa = "") {
+function buildSampleSearchResults(query = "", uoa = "") {
   const normalizedQuery = query.trim().toLowerCase();
   const normalizedUoa = uoa.trim().toLowerCase();
 
-  return index
+  return MOCK_CASES
     .filter((item) => {
       const title = cleanText(item.title).toLowerCase();
-      const caseId = String(item.id).toLowerCase();
+      const caseId = String(item.document_id).toLowerCase();
+      const institution = cleanText(item.institution).toLowerCase();
+      const modelName = cleanText(item.model_name).toLowerCase();
       const itemUoa = String(item.uoa || "").toLowerCase();
 
-      const matchesQuery = !normalizedQuery || title.includes(normalizedQuery) || caseId.includes(normalizedQuery) || itemUoa.includes(normalizedQuery);
+      const matchesQuery = !normalizedQuery || title.includes(normalizedQuery) || caseId.includes(normalizedQuery) || institution.includes(normalizedQuery) || modelName.includes(normalizedQuery) || itemUoa.includes(normalizedQuery);
       const matchesUoa = !normalizedUoa || itemUoa.includes(normalizedUoa);
 
       return matchesQuery && matchesUoa;
     })
     .slice(0, 12)
     .map((item) => ({
-      inference_id: `sample-${item.id}`,
-      document_id: item.id,
+      inference_id: item.inference_id,
+      document_id: item.document_id,
       title: cleanText(item.title),
-      model_name: "Sample MIL Fusion",
+      model_name: item.model_name,
       uoa: item.uoa,
-      institution: "Sample archive",
+      institution: item.institution,
     }));
 }
 
 async function getSampleCases(query = "", uoa = "") {
-  const index = await loadSampleIndex();
-  const results = buildSampleSearchResults(index, query, uoa);
+  const results = buildSampleSearchResults(query, uoa);
 
   if (query || uoa) {
     return results;
   }
 
-  return loadSampleCases(results.length > 0 ? Math.min(results.length, 10) : 10);
+  return loadSampleCases(10);
+}
+
+async function getSampleDraft(file) {
+  return {
+    title: file?.name || "Mock REF case study.pdf",
+    sections: {
+      summary: "This draft summary was generated from mock upload data. It represents the case overview section returned by the PDF extraction endpoint.",
+      research: "This draft underpinning research section describes the academic basis, methods, and findings that support the impact claim.",
+      impact: "This draft impact section describes beneficiaries, reach, significance, and evidence of change for the uploaded case study.",
+    },
+  };
+}
+
+function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
+  const featureNames = output.feature_names || [];
+  const featureGates = output.feature_gates || [];
+  const featureAttributions = Object.fromEntries(
+    featureNames.map((name, index) => [name, Number(featureGates[index] || 0)])
+  );
+
+  return {
+    inference_id: output.inference_id || `draft-${Date.now()}`,
+    document_id: output.document_id || "draft",
+    title: draft.title || "Untitled inference",
+    institution: draft.institution || "Draft upload",
+    uoa: draft.uoa || "User supplied case",
+    status: "draft",
+    ref_year: null,
+    ground_truth: null,
+    gpa: null,
+    true_label: null,
+    score: Number(output.score ?? 0),
+    label: output.label || (Number(output.score ?? 0) >= 0.5 ? "High Impact" : "Low Impact"),
+    attention: output.attention || [],
+    sentences: output.sentences || [],
+    model_prediction: Number(output.score ?? 0),
+    prediction_label: output.label || (Number(output.score ?? 0) >= 0.5 ? "High Impact" : "Low Impact"),
+    model_label: output.label,
+    model_name: output.model?.name || "Selected model",
+    input_granularity: output.model?.input_granularity,
+    narrative_contribution: output.narrative_contribution,
+    feature_contribution: output.feature_contribution,
+    inference_time_ms: output.inference_time_ms ?? output.inference_time ?? output.elapsed_ms ?? null,
+    config_id: output.model?.config_id || configId,
+    sections: draft.sections || {},
+    heatmap: (output.heatmap || []).map((item) => ({
+      sentence_text: item.sentence_text || item.sentence || "",
+      attention_score: Number(item.attention_score ?? item.attention ?? 0),
+    })),
+    features: output.features || {},
+    entities: output.entities || {},
+    ordered_features: output.ordered_features || [],
+    feature_names: featureNames,
+    feature_gates: featureGates,
+    feature_attributions: output.feature_attributions || featureAttributions,
+    global_importance: output.global_importance || {},
+  };
 }
 
 export const api = {
@@ -217,7 +281,7 @@ export const api = {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/analysis/configs`);
+      const response = await fetch(`${API_BASE}/analysis/models`);
       return handleResponse(response);
     } catch (error) {
       return getSampleConfigs();
@@ -244,8 +308,48 @@ export const api = {
     }
   },
 
+  async uploadCase(file) {
+    if (USE_SAMPLE_DATA) {
+      return getSampleDraft(file);
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE}/cases/upload`, {
+      method: "POST",
+      body: formData,
+    });
+    return handleResponse(response);
+  },
+
+  async runInference(sections, configId, draft = {}) {
+    if (USE_SAMPLE_DATA) {
+      return {
+        ...MOCK_CASES[0],
+        title: draft.title || MOCK_CASES[0].title,
+        sections,
+        inference_time_ms: MOCK_CASES[0].inference_time_ms,
+      };
+    }
+
+    const response = await fetch(`${API_BASE}/analysis/inference?config_id=${configId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        summary: sections.summary || "",
+        research: sections.research || "",
+        impact: sections.impact || "",
+      }),
+    });
+    const output = await handleResponse(response);
+    return normalizeInferenceOutput(output, { ...draft, sections }, configId);
+  },
+
   async getInferenceById(inferenceId) {
-    if (USE_SAMPLE_DATA || String(inferenceId).startsWith("sample-")) {
+    if (USE_SAMPLE_DATA || String(inferenceId).startsWith("mock-")) {
       return loadSampleCaseById(inferenceId);
     }
 
@@ -255,6 +359,15 @@ export const api = {
     } catch (error) {
       return loadSampleCaseById(inferenceId);
     }
+  },
+
+  async getLatestInference() {
+    if (USE_SAMPLE_DATA) {
+      return loadSampleCaseById(MOCK_CASES[0].inference_id);
+    }
+
+    const response = await fetch(`${API_BASE}/cases/latest`);
+    return handleResponse(response);
   },
 
   // --- CASE MANAGEMENT ---
@@ -276,7 +389,7 @@ export const api = {
   },
 
   async getCaseById(documentId) {
-    if (USE_SAMPLE_DATA || String(documentId).startsWith("sample-")) {
+    if (USE_SAMPLE_DATA || String(documentId).startsWith("mock-")) {
       return loadSampleCaseById(documentId);
     }
 
