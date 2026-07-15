@@ -63,6 +63,7 @@ def _save_inference_output(
     sections: InferenceSections,
     output: dict,
 ) -> dict:
+    title = _normalise_title(sections.title)
     features = output.get("features") or {}
     entities = output.get("entities") or {}
     sentences = output.get("sentences") or []
@@ -76,7 +77,7 @@ def _save_inference_output(
 
     with SessionLocal() as db:
         document = DocumentMetadata(
-            title=sections.title,
+            title=title,
             institution=sections.institution,
             uoa=sections.uoa,
             raw_text="\n\n".join(
@@ -123,8 +124,14 @@ def _save_inference_output(
         return {
             "document_id": document.document_id,
             "inference_id": inference.inference_id,
+            "title": title,
             "created_at": inference.created_at.isoformat() if inference.created_at else None,
         }
+
+
+def _normalise_title(value: str | None) -> str:
+    title = (value or "").strip()
+    return title or "Untitled inference"
 
 
 def _get_global_importance(config_id: int, feature_names: list[str]) -> dict[str, float]:

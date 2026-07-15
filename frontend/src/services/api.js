@@ -341,7 +341,7 @@ export const api = {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        title: draft.title || "Untitled inference",
+        title: cleanText(draft.title) || "Untitled inference",
         institution: draft.institution || "Draft upload",
         uoa: draft.uoa || "User supplied case",
         summary: sections.summary || "",

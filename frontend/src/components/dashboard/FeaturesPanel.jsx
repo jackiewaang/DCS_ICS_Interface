@@ -26,12 +26,26 @@ const BLACKLISTED = [
 
 const ENTITY_METRIC_SET = new Set(ENTITY_METRIC_KEYS);
 
+function toFiniteNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
 function getValueLabel(value, format) {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return 'N/A';
   }
 
-  return format ? format(value) : String(value);
+  const numericValue = toFiniteNumber(value);
+  if (!format) {
+    return numericValue === null ? String(value) : String(numericValue);
+  }
+
+  if (numericValue === null) {
+    return String(value);
+  }
+
+  return format(numericValue);
 }
 
 function getObservedRange(rows, key) {
@@ -70,8 +84,9 @@ function getFeatureRows(data, sortMode) {
 
       const value = features[featureKey];
       const definition = METRIC_DEFINITIONS[featureName] || getDefaultDefinition(featureName);
-      const localRaw = attributions[featureName] ?? attributions[`${featureName}_AbsAttribution`] ?? 0;
-      const globalRaw = globalImportance[featureName] || 0;
+      const localRaw = toFiniteNumber(attributions[featureName] ?? attributions[`${featureName}_AbsAttribution`]) ?? 0;
+      const globalRaw = toFiniteNumber(globalImportance[featureName]) ?? 0;
+      const numericValue = toFiniteNumber(value);
 
       return {
         name: featureName,
@@ -80,7 +95,7 @@ function getFeatureRows(data, sortMode) {
         globalRaw,
         definition,
         description: definition.description || definition.category || 'Model Feature',
-        interpretation: definition.getExplanation ? definition.getExplanation(Number(value)) : 'A weighted feature used by the AI model.',
+        interpretation: definition.getExplanation && numericValue !== null ? definition.getExplanation(numericValue) : 'A weighted feature used by the AI model.',
         bestRange: definition.bestRange || definition.range || 'N/A',
       };
     })
