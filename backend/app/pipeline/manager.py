@@ -274,6 +274,7 @@ class PipelineManager:
             details_text=impact_text,
         )
         entities = features.pop(ENTITY_LISTS_KEY, {})
+        self._add_entity_count_features(features, entities)
         ordered_features = self._ordered_feature_values(features, entities, model_config)
 
         sentences, embeddings = embedder.run_embedding_inference(
@@ -446,6 +447,17 @@ class PipelineManager:
                 value = 0
             values.append(float(value or 0))
         return values
+
+    def _add_entity_count_features(
+        self,
+        features: dict[str, Any],
+        entities: dict[str, list[str]],
+    ) -> None:
+        features["Number of organizations mentioned"] = len(entities.get("ORG", []))
+        features["Number of named individuals"] = len(entities.get("PERSON", []))
+        features["Number of countries or regions mentioned"] = (
+            len(entities.get("GPE", [])) + len(entities.get("LOC", []))
+        )
 
     def _feature_value(
         self,

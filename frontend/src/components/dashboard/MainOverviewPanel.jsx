@@ -162,7 +162,7 @@ export default function MainOverviewPanel({ data }) {
           <div className="mt-4">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground">Prediction probability</span>
-              <span className="text-sm font-semibold text-foreground">{predictionProbabilityPercentage.toFixed(0)}%</span>
+              <span className="text-sm font-semibold text-foreground">{predictionProbabilityPercentage.toFixed(2)}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div

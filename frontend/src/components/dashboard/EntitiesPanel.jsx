@@ -6,7 +6,7 @@ import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/Dashb
 
 const CATEGORIES = [
   { id: 'ORG', aliases: ['orgs', 'ORG'], featureAliases: ['ORG', 'Number of organizations mentioned'], label: 'Mentioned Organizations (ORG)' },
-  { id: 'MONEY', aliases: ['money', 'MONEY'], featureAliases: ['MONEY'], label: 'Economic Impact (MONEY)' },
+  { id: 'GPE_LOC', aliases: ['GPE', 'LOC'], featureAliases: ['Number of countries or regions mentioned', 'GPE', 'LOC'], label: 'Countries / Regions (GPE + LOC)' },
   { id: 'PERSON', aliases: ['people', 'PERSON'], featureAliases: ['PERSON', 'Number of named individuals'], label: 'Mentioned Individuals (PERSON)' },
 ];
 
@@ -17,9 +17,7 @@ function findFeatureKey(features, featureName) {
 }
 
 function getCategoryItems(entities, category) {
-  const rawItems = category.aliases.reduce((accumulator, alias) => {
-    return accumulator.length > 0 ? accumulator : (entities?.[alias] || []);
-  }, []);
+  const rawItems = category.aliases.flatMap((alias) => entities?.[alias] || []);
 
   return Array.from(new Set(rawItems.map((item) => decodeHTML(String(item)).trim()))).filter(Boolean);
 }
@@ -50,8 +48,10 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
   const categoryRows = useMemo(() => {
     return CATEGORIES.map((category) => {
       const items = getCategoryItems(entities, category);
-      const definition = METRIC_DEFINITIONS[category.id];
       const featureKey = category.featureAliases.map((alias) => findFeatureKey(features, alias)).find(Boolean);
+      const definition = METRIC_DEFINITIONS[category.id]
+        || METRIC_DEFINITIONS[featureKey]
+        || getDefaultDefinition(category.label);
       const localRaw = category.featureAliases.reduce((value, alias) => (
         value ?? attributions[alias] ?? attributions[`${alias}_AbsAttribution`]
       ), undefined) ?? 0;
