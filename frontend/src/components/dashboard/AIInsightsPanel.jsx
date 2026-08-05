@@ -1,61 +1,154 @@
+import { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
+import { api } from '@/services/api';
+
+const POLLING_INTERVAL_MS = 2500;
+
+const INSIGHT_CATEGORIES = [
+  {
+    key: 'significance_limitations',
+    title: 'Significance Limitations',
+    description: 'Risks that could weaken the interpretation or defensibility of the claimed impact.',
+  },
+  {
+    key: 'significance_improvements',
+    title: 'Significance Improvements',
+    description: 'Changes that would make the impact claim more compelling and decision-ready.',
+  },
+  {
+    key: 'outreach_limitations',
+    title: 'Outreach Limitations',
+    description: 'Gaps that make the breadth, uptake, or beneficiary coverage harder to assess.',
+  },
+  {
+    key: 'outreach_improvements',
+    title: 'Outreach Improvements',
+    description: 'Changes that would make reach and audience adoption easier to evaluate.',
+  },
+];
 
 function SectionTooltip({ text }) {
   return <DashboardHelp text={text} />;
 }
 
-function CriteriaBlock({ title, helpText, children, className = '' }) {
+function StatusBanner({ status, errorMessage }) {
+  const isRunning = status === 'loading' || status === 'running';
+  const isError = status === 'error';
+  const isNotFound = status === 'not_found';
+
   return (
-    <div className={className}>
-      <div className="mb-2 flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
-        <SectionTooltip text={helpText} />
+    <div
+      className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
+        isError
+          ? 'border-destructive/30 bg-destructive/5 text-destructive'
+          : 'border-border bg-muted/35 text-muted-foreground'
+      }`}
+    >
+      {isRunning ? <Loader2 className="mt-0.5 h-4 w-4 animate-spin" /> : null}
+      {isError || isNotFound ? <AlertCircle className="mt-0.5 h-4 w-4" /> : null}
+      <div className="space-y-1">
+        <p className="font-semibold text-foreground">
+          {isRunning && 'Generating AI insights'}
+          {isNotFound && 'No AI insight generated for this case'}
+          {isError && 'AI insight generation failed'}
+        </p>
+        <p className="leading-relaxed">
+          {isRunning && 'The panel is polling the LLM inference endpoint for the generated review responses.'}
+          {isNotFound && 'This inference does not have an associated LLM insight result.'}
+          {isError && (errorMessage || 'The LLM service returned an error while generating the review.')}
+        </p>
       </div>
-      {children}
     </div>
   );
 }
 
-function InsightSection({
-  title,
-  outreachText,
-  significanceText,
-  outreachTooltip,
-  significanceTooltip,
-}) {
-  const sectionKey = title.toLowerCase();
+function InsightCard({ title, description, items }) {
+  const responses = Array.isArray(items) ? items.filter(Boolean) : [];
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">{title}</h3>
+    <article className="flex min-h-48 flex-col rounded-md border border-border bg-background p-4 shadow-sm">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>
+        </div>
+        <CheckCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <CriteriaBlock
-          title="Outreach"
-          helpText={outreachTooltip}
-          className="md:col-span-1 rounded-md bg-muted/40 border-l-2 border-muted-500 px-3 py-3"
-        >
-          <p className="text-xs sm:text-sm leading-relaxed text-foreground">{sectionKey} for outreach will appear here.</p>
-          <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground">{outreachText}</p>
-        </CriteriaBlock>
-
-        <CriteriaBlock
-          title="Significance"
-          helpText={significanceTooltip}
-          className="md:col-span-2 rounded-md bg-muted/40 border-l-2 border-muted-500 px-3 py-3"
-        >
-          <p className="text-xs sm:text-sm leading-relaxed text-foreground">{sectionKey} for significance will appear here.</p>
-          <p className="text-xs sm:text-sm leading-relaxed text-muted-foreground">{significanceText}</p>
-        </CriteriaBlock>
-      </div>
-
-    </section>
+      {responses.length > 0 ? (
+        <ul className="space-y-3 text-sm leading-relaxed text-foreground">
+          {responses.map((response, index) => (
+            <li key={`${title}-${index}`} className="border-l-2 border-accent/70 pl-3">
+              {response}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm leading-relaxed text-muted-foreground">No generated response was returned for this category.</p>
+      )}
+    </article>
   );
 }
 
 export default function AIInsightsPanel({ data }) {
+  const inferenceId = data?.inference_id;
+  const [llmState, setLlmState] = useState({
+    inferenceId: null,
+    result: null,
+    status: 'idle',
+    errorMessage: '',
+  });
+
+  useEffect(() => {
+    if (!inferenceId) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    let intervalId;
+
+    const pollLLMInference = async () => {
+      try {
+        const result = await api.getLLMInference(inferenceId);
+        if (isCancelled) {
+          return;
+        }
+
+        setLlmState({
+          inferenceId,
+          result,
+          status: result.status || 'running',
+          errorMessage: result.status === 'error' ? result.error_message || '' : '',
+        });
+
+        if (['completed', 'error', 'not_found'].includes(result.status)) {
+          window.clearInterval(intervalId);
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setLlmState({
+          inferenceId,
+          result: null,
+          status: 'error',
+          errorMessage: error.message,
+        });
+        window.clearInterval(intervalId);
+      }
+    };
+
+    intervalId = window.setInterval(pollLLMInference, POLLING_INTERVAL_MS);
+    pollLLMInference();
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [inferenceId]);
+
   if (!data) {
     return (
       <section className="rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm">
@@ -64,11 +157,6 @@ export default function AIInsightsPanel({ data }) {
       </section>
     );
   }
-
-  const limitationsOutreach = 'Reach is moderate because the limitation is primarily visible when the model has to generalize across uneven evidence coverage or scattered passages.';
-  const limitationsSignificance = 'The limitation matters because it can affect how confidently the case should be interpreted and whether the prediction is stable enough for downstream use.';
-  const improvementsOutreach = 'Reach is broader when the guidance is translated into a clearer evidence summary that can be reviewed quickly by users across the workflow.';
-  const improvementsSignificance = 'The improvement is significant because it strengthens the final judgment and makes the recommendation more defensible.';
 
   const refGuidanceUrl = 'https://2029.ref.ac.uk/guidance/section-6-engagement-and-impact-guidance/';
 
@@ -83,22 +171,28 @@ export default function AIInsightsPanel({ data }) {
     </a>
   );
 
+  const llmResult = llmState.inferenceId === inferenceId ? llmState.result : null;
+  const status = inferenceId
+    ? llmState.inferenceId === inferenceId ? llmState.status : 'loading'
+    : 'idle';
+  const errorMessage = llmState.inferenceId === inferenceId ? llmState.errorMessage : '';
+  const isCompleted = status === 'completed';
   const panelContent = (
     <div className="space-y-8">
-      <InsightSection
-        title="Limitations"
-        // outreachText={limitationsOutreach}
-        // significanceText={limitationsSignificance}
-        outreachTooltip="Outreach describes how far the limitation reaches across audiences, workflows, and use cases."
-        significanceTooltip="Significance explains how strongly the limitation could affect interpretation and downstream decisions."
-      />
-      <InsightSection
-        title="Improvements"
-        // outreachText={improvementsOutreach}
-        // significanceText={improvementsSignificance}
-        outreachTooltip="Outreach describes how broadly the improvement would help readers, reviewers, and downstream decision-makers."
-        significanceTooltip="Significance explains how much the improvement would strengthen review quality and decision confidence."
-      />
+      {!isCompleted ? (
+        <StatusBanner status={status} errorMessage={errorMessage} />
+      ) : (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {INSIGHT_CATEGORIES.map((category) => (
+            <InsightCard
+              key={category.key}
+              title={category.title}
+              description={category.description}
+              items={llmResult?.[category.key]}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 
