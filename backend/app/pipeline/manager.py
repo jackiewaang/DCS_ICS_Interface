@@ -1,7 +1,10 @@
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import joblib
+import pandas as pd
 import torch
 from sqlalchemy import select
 
@@ -16,6 +19,7 @@ from app.pipeline.feature_extractor import (
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+EMBEDDINGS_OUTPUT_DIR = BACKEND_ROOT / "embeddings"
 DEFAULT_FEATURE_ORDER = [
     "Flesch Reading Ease",
     "Dale-Chall Readability Score",
@@ -286,6 +290,7 @@ class PipelineManager:
         )
         if not embeddings:
             raise ValueError("No text was available to embed for inference.")
+        embeddings_path = self._save_embeddings(sentences, embeddings, model_config)
         if model_config["input_dim"] is None:
             model_config["input_dim"] = len(embeddings[0])
 
@@ -311,6 +316,7 @@ class PipelineManager:
             "attention": attention,
             "heatmap": heatmap,
             "sentences": sentences,
+            "embeddings_path": str(embeddings_path),
             "features": features,
             "entities": entities,
             "ordered_features": ordered_features,
@@ -327,6 +333,29 @@ class PipelineManager:
                 "task": model_config["task"],
             },
         }
+
+    def _save_embeddings(
+        self,
+        sentences: list[str],
+        embeddings: list[list[float]],
+        model_config: dict[str, Any],
+    ) -> Path:
+        EMBEDDINGS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        output_path = EMBEDDINGS_OUTPUT_DIR / f"embeddings_{timestamp}_{uuid4().hex}.pkl"
+        output_df = pd.DataFrame(
+            {
+                "input": sentences,
+                "embeddings": embeddings,
+            }
+        )
+        output_df["config_id"] = model_config.get("config_id")
+        output_df["embedding_name"] = model_config.get("embedding_name")
+        output_df["input_granularity"] = model_config.get("input_granularity")
+        output_df.to_pickle(output_path)
+
+        return output_path
 
     def _get_config(self, config_id: int | str | None) -> ModelConfig:
         if config_id is None:
