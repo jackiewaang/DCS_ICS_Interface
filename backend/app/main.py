@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.api.endpoints.analysis import router as analysis_router
 from app.api.endpoints.cases import router as cases_router
+from app.api.endpoints.seeding import router as seeding_router
 from app.database import init_db
 
 @asynccontextmanager
@@ -27,6 +28,7 @@ app.add_middleware(
 
 app.include_router(cases_router)
 app.include_router(analysis_router)
+app.include_router(seeding_router)
 
 @app.get("/")
 def read_root():

@@ -23,6 +23,7 @@ ENTITY_FILES = {
     2014: ASSETS_ROOT / "REF2014" / "REF2014_ALL-SpaCy_NER_output_dict-en_core_web_sm.npy",
     2021: ASSETS_ROOT / "REF2021" / "REF2021_ALL-SpaCy_NER_output_dict-en_core_web_sm.npy",
 }
+SUPPORTED_REF_YEARS = set(FEATURE_FILES)
 
 METADATA_COLUMNS = {
     "institution",
@@ -78,6 +79,7 @@ def seed_past_cases(
     db: Session | None = None,
     feature_files: dict[int, Path] = FEATURE_FILES,
     entity_files: dict[int, Path] = ENTITY_FILES,
+    ref_year: int | None = None,
 ) -> int:
     """
     Upsert past REF case metadata and handcrafted features.
@@ -91,9 +93,10 @@ def seed_past_cases(
 
     try:
         seeded_count = 0
-        for ref_year, csv_path in sorted(feature_files.items()):
-            entities_by_case_id = _load_entities(entity_files.get(ref_year))
-            seeded_count += _seed_feature_file(db, ref_year, csv_path, entities_by_case_id)
+        for year in _selected_ref_years(ref_year):
+            csv_path = feature_files[year]
+            entities_by_case_id = _load_entities(entity_files.get(year))
+            seeded_count += _seed_feature_file(db, year, csv_path, entities_by_case_id)
 
         if owns_session:
             db.commit()
@@ -106,6 +109,25 @@ def seed_past_cases(
     finally:
         if owns_session:
             db.close()
+
+
+def seed_ref2014_past_cases(db: Session | None = None) -> int:
+    return seed_past_cases(db=db, ref_year=2014)
+
+
+def seed_ref2021_past_cases(db: Session | None = None) -> int:
+    return seed_past_cases(db=db, ref_year=2021)
+
+
+def _selected_ref_years(ref_year: int | None) -> list[int]:
+    if ref_year is None:
+        return sorted(SUPPORTED_REF_YEARS)
+
+    ref_year = _normalise_ref_year(ref_year)
+    if ref_year not in SUPPORTED_REF_YEARS:
+        raise ValueError(f"Unsupported REF year: {ref_year}")
+
+    return [ref_year]
 
 
 def _seed_feature_file(
@@ -247,6 +269,13 @@ def _safe_int(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def _normalise_ref_year(value: Any) -> int:
+    ref_year = _safe_int(value)
+    if ref_year is None:
+        raise ValueError(f"Invalid REF year: {value}")
+    return ref_year
 
 
 def _clean_string(value: Any) -> str | None:
