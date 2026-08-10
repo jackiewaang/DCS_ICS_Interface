@@ -375,6 +375,41 @@ export const api = {
     return handleResponse(response);
   },
 
+  async getLLMInference(inferenceId) {
+    if (USE_SAMPLE_DATA || String(inferenceId).startsWith("mock-")) {
+      return {
+        inference_id: inferenceId,
+        status: "completed",
+        significance_limitations: [
+          "The claim would benefit from clearer evidence that links the reported outcomes to measurable change for beneficiaries.",
+          "The case could distinguish more directly between academic contribution and the significance of the achieved impact.",
+        ],
+        significance_improvements: [
+          "Add concise before-and-after indicators that show the scale and importance of the change.",
+          "Tie the strongest evidence statements to named beneficiary groups and decision contexts.",
+        ],
+        outreach_limitations: [
+          "The reach narrative is broad, but some audiences and adoption pathways are described at a high level.",
+          "The case could make geographic or sector spread easier to verify from the current evidence.",
+        ],
+        outreach_improvements: [
+          "Summarise adoption by audience, location, and partner type so reach can be scanned quickly.",
+          "Prioritise the highest-confidence examples of uptake instead of spreading attention across weaker claims.",
+        ],
+      };
+    }
+
+    const response = await fetch(`${API_BASE}/analysis/llm-inference/${inferenceId}`);
+    if (response.status === 404) {
+      return {
+        inference_id: inferenceId,
+        status: "not_found",
+      };
+    }
+
+    return handleResponse(response);
+  },
+
   // --- CASE MANAGEMENT ---
   async getCases(query = "", uoa = "") {
     if (USE_SAMPLE_DATA) {

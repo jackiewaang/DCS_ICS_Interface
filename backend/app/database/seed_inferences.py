@@ -18,19 +18,26 @@ CASE_FEATURE_ATTENTION_TEST = "case_feature_attention_test.csv"
 FEATURE_VALIDATION_SUMMARY = "feature_validation_summary.csv"
 SENTENCE_ATTENTION_TEST = "sentence_attention_test.csv"
 ATTRIBUTION_SUFFIX = "_AbsAttribution"
+SUPPORTED_REF_YEARS = {2014, 2021}
 
 
-def seed_inferences(db: Session | None = None, models_root: Path = MODELS_ROOT) -> dict[str, int]:
+def seed_inferences(
+    db: Session | None = None,
+    models_root: Path = MODELS_ROOT,
+    ref_year: int | None = None,
+) -> dict[str, int]:
     """
     Seed model-level importances, case predictions, branch contributions, and sentence attention.
 
     Model configs and past cases should already exist in the database. Missing model configs
     or case IDs are skipped so this can be run against partially populated assets.
+    When ref_year is provided, only documents from that REF year receive inferences.
     """
     owns_session = db is None
     db = db or SessionLocal()
 
     try:
+        selected_ref_year = _normalise_ref_year(ref_year) if ref_year is not None else None
         totals = {
             "models": 0,
             "feature_importances": 0,
@@ -56,6 +63,7 @@ def seed_inferences(db: Session | None = None, models_root: Path = MODELS_ROOT) 
                 db,
                 model_config,
                 model_dir,
+                ref_year=selected_ref_year,
             )
             totals["inferences"] += len(inference_by_case_id)
             totals["missing_documents"] += missing_documents
@@ -76,6 +84,14 @@ def seed_inferences(db: Session | None = None, models_root: Path = MODELS_ROOT) 
     finally:
         if owns_session:
             db.close()
+
+
+def seed_ref2014_inferences(db: Session | None = None) -> dict[str, int]:
+    return seed_inferences(db=db, ref_year=2014)
+
+
+def seed_ref2021_inferences(db: Session | None = None) -> dict[str, int]:
+    return seed_inferences(db=db, ref_year=2021)
 
 
 def _get_model_config(db: Session, model_dir: Path) -> ModelConfig | None:
@@ -142,6 +158,7 @@ def _seed_case_predictions(
     db: Session,
     model_config: ModelConfig,
     model_dir: Path,
+    ref_year: int | None = None,
 ) -> tuple[dict[str, Inference], int]:
     inference_by_case_id: dict[str, Inference] = {}
     missing_documents = 0
@@ -153,9 +170,13 @@ def _seed_case_predictions(
                 if not case_id:
                     continue
 
-                document = db.scalar(
-                    select(DocumentMetadata).where(DocumentMetadata.case_id == case_id)
+                document_stmt = select(DocumentMetadata).where(
+                    DocumentMetadata.case_id == case_id
                 )
+                if ref_year is not None:
+                    document_stmt = document_stmt.where(DocumentMetadata.ref_year == ref_year)
+
+                document = db.scalar(document_stmt)
                 if document is None:
                     missing_documents += 1
                     continue
@@ -295,6 +316,13 @@ def _safe_int(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def _normalise_ref_year(value: Any) -> int:
+    ref_year = _safe_int(value)
+    if ref_year not in SUPPORTED_REF_YEARS:
+        raise ValueError(f"Unsupported REF year: {value}")
+    return ref_year
 
 
 def _normalise_case_id(value: Any) -> str:

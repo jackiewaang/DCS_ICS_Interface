@@ -1,12 +1,21 @@
+import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
 from app.database import SessionLocal
+from app.llm.service import generate_review
 from app.models.document import DocumentFeatures, DocumentMetadata
-from app.models.inference import Attention, Inference, ModelConfig, ModelFeatureImportance
+from app.models.inference import (
+    Attention,
+    Inference,
+    LLMInference,
+    LLMInferenceStatus,
+    ModelConfig,
+    ModelFeatureImportance,
+)
 from app.pipeline.manager import PipelineManager
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
@@ -54,8 +63,56 @@ async def run_inference(config_id: int, sections: InferenceSections):
         sections=sections,
         output=output,
     ))
+    _create_llm_inference(output["inference_id"])
+    asyncio.create_task(_run_llm_review(output["inference_id"]))
 
     return output
+
+
+@router.get("/llm-inference/{inference_id}")
+def get_llm_inference(inference_id: int):
+    with SessionLocal() as db:
+        llm_inference = db.scalar(
+            select(LLMInference).where(LLMInference.inference_id == inference_id)
+        )
+
+        if llm_inference is None:
+            raise HTTPException(status_code=404, detail="LLM inference result not found")
+
+        status = _status_value(llm_inference.status)
+        if status == LLMInferenceStatus.ERROR.value:
+            return {
+                "inference_id": inference_id,
+                "status": status,
+                "error_message": llm_inference.error_message,
+            }
+
+        if status == LLMInferenceStatus.COMPLETED.value:
+            return {
+                "inference_id": inference_id,
+                "status": status,
+                "significance_limitations": _json_loads(
+                    llm_inference.significance_limitations,
+                    default=[],
+                ),
+                "significance_improvements": _json_loads(
+                    llm_inference.significance_improvements,
+                    default=[],
+                ),
+                "outreach_limitations": _json_loads(
+                    llm_inference.outreach_limitations,
+                    default=[],
+                ),
+                "outreach_improvements": _json_loads(
+                    llm_inference.outreach_improvements,
+                    default=[],
+                ),
+            }
+
+        return {
+            "inference_id": inference_id,
+            "status": status,
+        }
 
 
 def _save_inference_output(
@@ -129,6 +186,24 @@ def _save_inference_output(
         }
 
 
+def _create_llm_inference(inference_id: int) -> None:
+    with SessionLocal() as db:
+        db.add(
+            LLMInference(
+                inference_id=inference_id,
+                status=LLMInferenceStatus.RUNNING,
+            )
+        )
+        db.commit()
+
+
+async def _run_llm_review(inference_id: int) -> None:
+    try:
+        await generate_review(inference_id)
+    except Exception:
+        pass
+
+
 def _normalise_title(value: str | None) -> str:
     title = (value or "").strip()
     return title or "Untitled inference"
@@ -149,3 +224,16 @@ def _get_global_importance(config_id: int, feature_names: list[str]) -> dict[str
         }
 
     return {feature_name: 0.0 for feature_name in feature_names}
+
+
+def _status_value(status: LLMInferenceStatus | str) -> str:
+    return status.value if isinstance(status, LLMInferenceStatus) else status
+
+
+def _json_loads(value: str | None, default):
+    if not value:
+        return default
+    try:
+        return json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        return default

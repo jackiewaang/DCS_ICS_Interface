@@ -1,13 +1,21 @@
 from typing import Any, Dict
 from datetime import datetime, timezone
+from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class LLMInferenceStatus(str, Enum):
+    RUNNING = "running"
+    ERROR = "error"
+    COMPLETED = "completed"
+
 
 class ModelConfig(Base):
     __tablename__ = "model_configs"
@@ -103,6 +111,41 @@ class Inference(Base):
         back_populates="inference",
         cascade="all, delete-orphan",
     )
+    llm_inference = relationship(
+        "LLMInference",
+        back_populates="inference",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
+class LLMInference(Base):
+    __tablename__ = "llm_inferences"
+
+    llm_inference_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    inference_id: Mapped[int] = mapped_column(
+        ForeignKey("inferences.inference_id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    significance_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    significance_improvements: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outreach_limitations: Mapped[str | None] = mapped_column(Text, nullable=True)
+    outreach_improvements: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[LLMInferenceStatus] = mapped_column(
+        SQLEnum(
+            LLMInferenceStatus,
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+            native_enum=False,
+            create_constraint=True,
+            name="llm_inference_status",
+            validate_strings=True,
+        ),
+        default=LLMInferenceStatus.RUNNING,
+        nullable=False,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    inference: Mapped[Inference] = relationship(back_populates="llm_inference")
 
 
 class Attention(Base):
