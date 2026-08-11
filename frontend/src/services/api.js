@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
+const API_BASE = "/api";
 const USE_SAMPLE_DATA = import.meta.env.VITE_USE_SAMPLE_DATA === "true";
 
 const MOCK_CONFIGS = [
