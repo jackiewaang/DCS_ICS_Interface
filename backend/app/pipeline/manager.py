@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Any
-from uuid import uuid4
 
 import joblib
 import pandas as pd
@@ -290,7 +290,12 @@ class PipelineManager:
         )
         if not embeddings:
             raise ValueError("No text was available to embed for inference.")
-        embeddings_path = self._save_embeddings(sentences, embeddings, model_config)
+        embeddings_path = self._save_embeddings(
+            sentences,
+            embeddings,
+            model_config,
+            source_filename=self._source_filename(sections),
+        )
         if model_config["input_dim"] is None:
             model_config["input_dim"] = len(embeddings[0])
 
@@ -339,11 +344,19 @@ class PipelineManager:
         sentences: list[str],
         embeddings: list[list[float]],
         model_config: dict[str, Any],
+        source_filename: str | None = None,
     ) -> Path:
         EMBEDDINGS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        output_path = EMBEDDINGS_OUTPUT_DIR / f"embeddings_{timestamp}_{uuid4().hex}.pkl"
+        filename_parts = [
+            "embeddings",
+            timestamp,
+            self._filename_part(model_config.get("name") or model_config.get("embedding_name")),
+        ]
+        if source_filename:
+            filename_parts.append(self._filename_part(Path(source_filename).stem))
+        output_path = EMBEDDINGS_OUTPUT_DIR / f"{'_'.join(filename_parts)}.pkl"
         output_df = pd.DataFrame(
             {
                 "input": sentences,
@@ -356,6 +369,15 @@ class PipelineManager:
         output_df.to_pickle(output_path)
 
         return output_path
+
+    def _source_filename(self, sections: dict[str, str] | str) -> str | None:
+        if not isinstance(sections, dict):
+            return None
+        return sections.get("title")
+
+    def _filename_part(self, value: Any) -> str:
+        cleaned = re.sub(r"[^A-Za-z0-9]+", "-", str(value or "").strip())
+        return cleaned.strip("-") or "unknown"
 
     def _get_config(self, config_id: int | str | None) -> ModelConfig:
         if config_id is None:

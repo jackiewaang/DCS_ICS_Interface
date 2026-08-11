@@ -7,7 +7,7 @@ source ../backend/venv311/bin/activate
 MODEL="Qwen/Qwen3-4B-Instruct-2507"
 
 vllm serve $MODEL \
-    --max-model-len 4096 \
+    --max-model-len 8192 \
     --gpu-memory-utilization 0.9 \
     --port 8000 \
     --host 0.0.0.0
