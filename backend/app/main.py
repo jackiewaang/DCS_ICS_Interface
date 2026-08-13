@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 from app.api.endpoints.analysis import router as analysis_router
 from app.api.endpoints.cases import router as cases_router
 from app.api.endpoints.seeding import router as seeding_router
+from app.core.config import get_settings
 from app.database import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    get_settings()
     print("Checking database tables...")
     init_db() 
     yield
