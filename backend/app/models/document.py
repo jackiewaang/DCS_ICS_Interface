@@ -1,4 +1,6 @@
-from sqlalchemy import Float, ForeignKey, Integer, JSON, Text
+from datetime import datetime
+
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
@@ -25,6 +27,10 @@ class DocumentMetadata(Base):
     summary_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     research_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     impact_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     features = relationship(
         "DocumentFeatures",

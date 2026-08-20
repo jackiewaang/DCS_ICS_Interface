@@ -20,6 +20,7 @@ from app.pipeline.feature_extractor import (
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 EMBEDDINGS_OUTPUT_DIR = BACKEND_ROOT / "embeddings"
+SAVE_EMBEDDINGS_PICKLE = False
 DEFAULT_FEATURE_ORDER = [
     "Flesch Reading Ease",
     "Dale-Chall Readability Score",
@@ -290,12 +291,14 @@ class PipelineManager:
         )
         if not embeddings:
             raise ValueError("No text was available to embed for inference.")
-        embeddings_path = self._save_embeddings(
-            sentences,
-            embeddings,
-            model_config,
-            source_filename=self._source_filename(sections),
-        )
+        embeddings_path = None
+        if SAVE_EMBEDDINGS_PICKLE:
+            embeddings_path = self._save_embeddings(
+                sentences,
+                embeddings,
+                model_config,
+                source_filename=self._source_filename(sections),
+            )
         if model_config["input_dim"] is None:
             model_config["input_dim"] = len(embeddings[0])
 
@@ -321,7 +324,7 @@ class PipelineManager:
             "attention": attention,
             "heatmap": heatmap,
             "sentences": sentences,
-            "embeddings_path": str(embeddings_path),
+            "embeddings_path": str(embeddings_path) if embeddings_path else None,
             "features": features,
             "entities": entities,
             "ordered_features": ordered_features,

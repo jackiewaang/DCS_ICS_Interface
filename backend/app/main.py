@@ -5,13 +5,23 @@ from app.api.endpoints.analysis import router as analysis_router
 from app.api.endpoints.cases import router as cases_router
 from app.api.endpoints.seeding import router as seeding_router
 from app.database import init_db
+from app.retention import (
+    ensure_retention_schema,
+    start_cleanup_task,
+    stop_cleanup_task,
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Checking database tables...")
-    init_db() 
-    yield
-    print("Shutting down...")
+    init_db()
+    ensure_retention_schema()
+    cleanup_task = start_cleanup_task()
+    try:
+        yield
+    finally:
+        await stop_cleanup_task(cleanup_task)
+        print("Shutting down...")
 
 app = FastAPI(
     title="The Language of REF API",

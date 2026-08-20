@@ -17,6 +17,7 @@ from app.models.inference import (
     ModelFeatureImportance,
 )
 from app.pipeline.manager import PipelineManager
+from app.retention import user_analysis_expiry
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
@@ -145,6 +146,7 @@ def _save_inference_output(
             summary_text=sections.summary,
             research_text=sections.research,
             impact_text=sections.impact,
+            expires_at=user_analysis_expiry(),
             features=DocumentFeatures(
                 features_json=json.dumps(features),
                 entities_json=json.dumps(entities),
