@@ -410,6 +410,26 @@ export const api = {
     return handleResponse(response);
   },
 
+  // --- FEEDBACK ---
+  async submitFeedback(feedback) {
+    if (USE_SAMPLE_DATA) {
+      return {
+        feedback_id: Date.now(),
+        ...feedback,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    const response = await fetch(`${API_BASE}/feedback/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(feedback),
+    });
+    return handleResponse(response);
+  },
+
   // --- CASE MANAGEMENT ---
   async getCases(query = "", uoa = "") {
     if (USE_SAMPLE_DATA) {

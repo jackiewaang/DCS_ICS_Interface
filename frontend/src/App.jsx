@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { api } from "./services/api";
-import { Search, Upload, Terminal, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Settings2 } from "lucide-react";
+import { Search, Upload, Terminal, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MessageSquare, Settings2 } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
+import FeedbackPage from "./pages/FeedbackPage";
 import UploadPage from "./pages/UploadPage";
 import PromptLab from "./pages/PromptLab";
 import NavItem from "./components/ui/NavItem";
@@ -12,10 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 
 export default function App() {
   const [currentView, setCurrentView] = useState("browse");
@@ -42,8 +40,6 @@ export default function App() {
     setSelectedCaseId(newInferenceId);
     setCurrentView("browse");
   };
-
-  const activeConfig = models.find(m => m.config_id.toString() === activeConfigId);
 
   return (
     <div className="flex bg-background overflow-hidden h-screen w-full text-foreground">
@@ -84,6 +80,13 @@ export default function App() {
             onClick={() => setCurrentView("prompts")}
             isCollapsed={isCollapsed}
           />
+          <NavItem
+            icon={<MessageSquare className="h-4 w-4 shrink-0" />}
+            label="Feedback"
+            isActive={currentView === "feedback"}
+            onClick={() => setCurrentView("feedback")}
+            isCollapsed={isCollapsed}
+          />
         </nav>
 
         <div className={`mt-auto border-t border-slate-600/50 p-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0 overflow-hidden' : 'opacity-100'}`}>
@@ -120,69 +123,6 @@ export default function App() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <Separator className="bg-slate-600/50" />
-
-                <div className="space-y-3">
-                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Enabled features</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="features" 
-                        checked={activeConfig?.use_features === 1} 
-                        disabled 
-                        className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
-                      />
-                      <label className="text-xs text-slate-300 font-medium leading-none">
-                        Linguistic GTFs
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox 
-                        id="spacy" 
-                        checked={activeConfig?.input_granularity === "sentence"} 
-                        disabled 
-                        className="border-slate-500 data-[state=checked]:bg-slate-200 data-[state=checked]:text-slate-950 disabled:opacity-50" 
-                      />
-                      <label className="text-xs text-slate-300 font-medium leading-none">
-                        Attention Heatmap
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator className="bg-slate-600/50" />
-
-                <div className="space-y-3">
-                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Input resolution</Label>
-                  <RadioGroup 
-                    value={activeConfig?.input_granularity === "full_text" ? "document" : "sentence"} 
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem 
-                        value="document" 
-                        id="full" 
-                        disabled 
-                        className="border-slate-500 text-slate-200 disabled:opacity-50" 
-                      />
-                      <Label htmlFor="full" className="text-xs text-slate-300 font-medium cursor-default">
-                        Document Level
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem 
-                        value="sentence" 
-                        id="sentence" 
-                        disabled 
-                        className="border-slate-500 text-slate-200 disabled:opacity-50" 
-                      />
-                      <Label htmlFor="sentence" className="text-xs text-slate-300 font-medium cursor-default">
-                        Sentence Level (MIL)
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
               </div>
             </div>
           </div>
@@ -203,6 +143,7 @@ export default function App() {
           />
         )}
         {currentView === "prompts" && <PromptLab />}
+        {currentView === "feedback" && <FeedbackPage />}
       </main>
     </div>
   );

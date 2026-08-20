@@ -2,9 +2,9 @@ import asyncio
 from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, inspect, text
+from sqlalchemy import delete
 
-from app.database.session import SessionLocal, engine
+from app.database.session import SessionLocal
 from app.models.document import DocumentMetadata
 
 
@@ -12,21 +12,6 @@ from app.models.document import DocumentMetadata
 DELETE_USER_ANALYSES_AFTER_TTL = True
 USER_ANALYSIS_TTL = timedelta(minutes=2)
 CLEANUP_INTERVAL_SECONDS = 60
-
-
-def ensure_retention_schema() -> None:
-    """Add the nullable expiry column for databases created before this feature."""
-    columns = {
-        column["name"]
-        for column in inspect(engine).get_columns(DocumentMetadata.__tablename__)
-    }
-    if "expires_at" in columns:
-        return
-
-    with engine.begin() as connection:
-        connection.execute(
-            text("ALTER TABLE document_metadata ADD COLUMN expires_at DATETIME")
-        )
 
 
 def user_analysis_expiry() -> datetime | None:
