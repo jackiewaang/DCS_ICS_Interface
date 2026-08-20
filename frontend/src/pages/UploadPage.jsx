@@ -8,16 +8,19 @@ const SECTION_FIELDS = [
     id: 'summary',
     label: 'Summary of Impact',
     description: 'High-level overview of the impact.',
+    suggestedWords: 100,
   },
   {
     id: 'research',
     label: 'Underpinning Research',
     description: 'Core research that enabled the impact.',
+    suggestedWords: 600,
   },
   {
     id: 'impact',
     label: 'Details of Impact',
     description: 'Evidence of how the impact was achieved.',
+    suggestedWords: 1500,
   },
 ];
 

@@ -84,8 +84,8 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
         The table below summarises the entities extracted from the document using Named Entity Recognition (NER) grouped into relevant categories. The counts indicate how many unique entities were detected in each category, providing a quick overview of key individuals, organisations and economic impacts.
       </p> */}
 
-      <div className="overflow-visible rounded-lg border border-border bg-background/80 shadow-sm">
-        <table className="w-full border-collapse text-left">
+      <div className="overflow-x-auto rounded-lg border border-border bg-background/80 shadow-sm">
+        <table className="w-full min-w-[72rem] border-collapse text-left">
           <thead>
             <tr className="border-b border-border bg-muted/30 text-xs font-bold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-3">NER Category</th>
@@ -124,7 +124,7 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
                     <button
                       type="button"
                       onClick={() => setActiveCategory(isActive ? null : row.id)}
-                      className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+                      className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
                     >
                       {isActive ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {isActive ? 'Hide list' : 'Show list'}

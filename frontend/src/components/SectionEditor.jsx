@@ -140,46 +140,51 @@ export default function SectionEditor({
               )}
             </div>
 
-            <div className="grid gap-4">
-              {sections.map((section) => (
-                <div key={section.id} className="rounded-md border border-slate-200 bg-slate-50/60">
-                  <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-                    <div>
-                      <label htmlFor={`section-${section.id}`} className="text-sm font-semibold text-slate-900">
-                        {section.label}
-                      </label>
-                      <p className="mt-1 text-xs text-slate-500">{section.description}</p>
+            <div>
+              <p className="mb-3 text-right text-xs text-slate-400">
+                REF 2029 maximum: 2,200 words overall
+              </p>
+              <div className="grid gap-4">
+                {sections.map((section) => (
+                  <div key={section.id} className="rounded-md border border-slate-200 bg-slate-50/60">
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                      <div>
+                        <label htmlFor={`section-${section.id}`} className="text-sm font-semibold text-slate-900">
+                          {section.label}
+                        </label>
+                        <p className="mt-1 text-xs text-slate-500">{section.description}</p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-slate-400">
+                          {countWords(draft.sections[section.id]).toLocaleString()} words · Suggested ~{section.suggestedWords.toLocaleString()}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => onToggleSection(section.id)}
+                          className="h-8 gap-2 px-2 text-slate-500 cursor-pointer"
+                        >
+                          {collapsedSections[section.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                          {collapsedSections[section.id] ? 'Edit' : 'Collapse'}
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-slate-400">
-                        {countWords(draft.sections[section.id]).toLocaleString()} words
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => onToggleSection(section.id)}
-                        className="h-8 gap-2 px-2 text-slate-500 cursor-pointer"
-                      >
-                        {collapsedSections[section.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                        {collapsedSections[section.id] ? 'Edit' : 'Collapse'}
-                      </Button>
-                    </div>
+                    {!collapsedSections[section.id] && (
+                      <div className="px-4 pb-4">
+                        <textarea
+                          id={`section-${section.id}`}
+                          value={draft.sections[section.id]}
+                          onChange={(event) => onSectionChange(section.id, event.target.value)}
+                          placeholder={hasDraft ? 'No text was extracted for this section.' : 'Extracted section text will appear here.'}
+                          className="min-h-40 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-800 outline-none transition-colors focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                        />
+                      </div>
+                    )}
                   </div>
-
-                  {!collapsedSections[section.id] && (
-                    <div className="px-4 pb-4">
-                      <textarea
-                        id={`section-${section.id}`}
-                        value={draft.sections[section.id]}
-                        onChange={(event) => onSectionChange(section.id, event.target.value)}
-                        placeholder={hasDraft ? 'No text was extracted for this section.' : 'Extracted section text will appear here.'}
-                        className="min-h-40 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-800 outline-none transition-colors focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
