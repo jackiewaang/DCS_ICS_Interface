@@ -38,6 +38,7 @@ def seed_models(db: Session | None = None, models_root: Path = MODELS_ROOT) -> i
 
             db_model_config = _upsert_model_config(db, model_config)
             db.flush()
+            _seed_feature_importances(db, db_model_config, config_path.parent)
             seeded_count += 1
 
         if owns_session:
