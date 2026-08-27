@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
-import { api } from '@/services/api';
-
-const POLLING_INTERVAL_MS = 2500;
+import useLLMInference from '@/hooks/useLLMInference';
 
 const INSIGHT_CATEGORIES = [
   {
@@ -91,63 +88,10 @@ function InsightCard({ title, description, items }) {
   );
 }
 
-export default function AIInsightsPanel({ data }) {
+export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
   const inferenceId = data?.inference_id;
-  const [llmState, setLlmState] = useState({
-    inferenceId: null,
-    result: null,
-    status: 'idle',
-    errorMessage: '',
-  });
-
-  useEffect(() => {
-    if (!inferenceId) {
-      return undefined;
-    }
-
-    let isCancelled = false;
-    let intervalId;
-
-    const pollLLMInference = async () => {
-      try {
-        const result = await api.getLLMInference(inferenceId);
-        if (isCancelled) {
-          return;
-        }
-
-        setLlmState({
-          inferenceId,
-          result,
-          status: result.status || 'running',
-          errorMessage: result.status === 'error' ? result.error_message || '' : '',
-        });
-
-        if (['completed', 'error', 'not_found'].includes(result.status)) {
-          window.clearInterval(intervalId);
-        }
-      } catch (error) {
-        if (isCancelled) {
-          return;
-        }
-
-        setLlmState({
-          inferenceId,
-          result: null,
-          status: 'error',
-          errorMessage: error.message,
-        });
-        window.clearInterval(intervalId);
-      }
-    };
-
-    intervalId = window.setInterval(pollLLMInference, POLLING_INTERVAL_MS);
-    pollLLMInference();
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [inferenceId]);
+  const internalLlmState = useLLMInference(providedLlmState ? null : inferenceId);
+  const llmState = providedLlmState || internalLlmState;
 
   if (!data) {
     return (

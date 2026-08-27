@@ -7,10 +7,52 @@ import re
 import pdfplumber
 
 
-def cleaning_pipeline(text: str) -> str:
-    text = re.sub(r"\s+", " ", text)
+def clean_text(text: str) -> str:
+    text = re.sub(r"_x000D_", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"_x[0-9A-Fa-f]{4}_", " ", text)
     text = html.unescape(text)
-    text = re.sub(r"http[s]?://", "", text)
+    text = text.replace("\\n", "\n")
+    text = text.replace("\\'", "'").replace("`", "'")
+    text = re.sub(r"\s+([.,;:!?])", r"\1", text)
+    text = re.sub(r"(\d),\s+(\d{3})", r"\1,\2", text)
+    text = re.sub(r"(\d+)\s*\.\s*(\d+)", r"\1.\2", text)
+    text = re.sub(r"\b(e|i)\s*\.\s*(g|e)\b", r"\1.\2", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    lines = text.split("\n")
+    cleaned_lines = []
+    buffer = ""
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            if buffer:
+                cleaned_lines.append(buffer.strip())
+                buffer = ""
+            cleaned_lines.append("")
+        elif re.match(r"^[\W_]*$", stripped):
+            continue
+        elif buffer and not buffer.endswith((".", ":", "?", "!", '"')):
+            buffer += " " + stripped
+        else:
+            if buffer:
+                cleaned_lines.append(buffer.strip())
+            buffer = stripped
+
+    if buffer:
+        cleaned_lines.append(buffer.strip())
+
+    text = "\n".join(cleaned_lines)
+    text = re.sub(r"([a-z0-9.,;:])\n(?=[a-z])", r"\1 ", text)
+    text = re.sub(r"\n\n\s+", "\n\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(
+        r"\(\s*([^)]+?)\s*\)\s*\n\s*([a-zA-Z])",
+        r"(\1) \2",
+        text,
+    )
+    text = re.sub(r"(\\n)+", "\n", text)
     return text.strip()
 
 
@@ -37,23 +79,55 @@ class DocumentExtractorEngine:
         for line in lines:
             norm = normalize_heading(line)
 
-            if re.match(r"^\s*1\.\s*summary of the impact", norm):
+            match = re.match(
+                r"^\s*1\.\s*summary of the impact\s*:?\s*(.*)$",
+                norm,
+                re.IGNORECASE,
+            )
+            if match:
                 current = "summary"
+                remainder = match.group(1).strip()
+                if remainder:
+                    sections[current].append(remainder)
                 continue
 
-            if re.match(r"^\s*2\.\s*underpinning research", norm):
+            match = re.match(
+                r"^\s*2\.\s*underpinning research\s*:?\s*(.*)$",
+                norm,
+                re.IGNORECASE,
+            )
+            if match:
                 current = "research"
+                remainder = match.group(1).strip()
+                if remainder:
+                    sections[current].append(remainder)
                 continue
 
-            if re.match(r"^\s*3\.\s*references to the research", norm):
+            if re.match(
+                r"^\s*3\.\s*references to the research",
+                norm,
+                re.IGNORECASE,
+            ):
                 current = None
                 continue
 
-            if re.match(r"^\s*4\.\s*details of the impact", norm):
+            match = re.match(
+                r"^\s*4\.\s*details of the impact\s*:?\s*(.*)$",
+                norm,
+                re.IGNORECASE,
+            )
+            if match:
                 current = "impact"
+                remainder = match.group(1).strip()
+                if remainder:
+                    sections[current].append(remainder)
                 continue
 
-            if re.match(r"^\s*5\.\s*sources to corroborate the impact", norm):
+            if re.match(
+                r"^\s*5\.\s*sources to corroborate the impact",
+                norm,
+                re.IGNORECASE,
+            ):
                 current = None
                 continue
 
@@ -61,9 +135,9 @@ class DocumentExtractorEngine:
                 sections[current].append(line)
 
         return {
-            "summary": cleaning_pipeline("\n".join(sections["summary"])),
-            "research": cleaning_pipeline("\n".join(sections["research"])),
-            "impact": cleaning_pipeline("\n".join(sections["impact"])),
+            "summary": clean_text("\n".join(sections["summary"])),
+            "research": clean_text("\n".join(sections["research"])),
+            "impact": clean_text("\n".join(sections["impact"])),
         }
 
     def extract(self, pdf_bytes: bytes) -> dict[str, str]:

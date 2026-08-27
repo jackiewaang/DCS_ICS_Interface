@@ -14,9 +14,10 @@ from app.models.inference import (
     LLMInference,
     LLMInferenceStatus,
     ModelConfig,
-    ModelFeatureImportance,
 )
 from app.pipeline.manager import PipelineManager
+from app.repositories.model_config_repository import get_global_importance
+from app.retention import user_analysis_expiry
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
@@ -54,7 +55,7 @@ async def run_inference(config_id: int, sections: InferenceSections):
         section_payload,
         config_id=config_id,
     )
-    output["global_importance"] = _get_global_importance(
+    output["global_importance"] = get_global_importance(
         config_id=config_id,
         feature_names=output.get("feature_names", []),
     )
@@ -145,6 +146,7 @@ def _save_inference_output(
             summary_text=sections.summary,
             research_text=sections.research,
             impact_text=sections.impact,
+            expires_at=user_analysis_expiry(),
             features=DocumentFeatures(
                 features_json=json.dumps(features),
                 entities_json=json.dumps(entities),
@@ -207,23 +209,6 @@ async def _run_llm_review(inference_id: int) -> None:
 def _normalise_title(value: str | None) -> str:
     title = (value or "").strip()
     return title or "Untitled inference"
-
-
-def _get_global_importance(config_id: int, feature_names: list[str]) -> dict[str, float]:
-    with SessionLocal() as db:
-        rows = db.scalars(
-            select(ModelFeatureImportance).where(
-                ModelFeatureImportance.config_id == config_id
-            )
-        ).all()
-
-    if rows:
-        return {
-            row.feature_name: row.mean_permutation_importance
-            for row in rows
-        }
-
-    return {feature_name: 0.0 for feature_name in feature_names}
 
 
 def _status_value(status: LLMInferenceStatus | str) -> str:

@@ -6,8 +6,9 @@ from sqlalchemy.orm import joinedload
 
 from app.database import SessionLocal
 from app.models.document import DocumentMetadata
-from app.models.inference import Attention, Inference, ModelConfig, ModelFeatureImportance
+from app.models.inference import Attention, Inference, ModelConfig
 from app.pipeline.document_extractor import document_extractor
+from app.repositories.model_config_repository import get_global_importance
 
 router = APIRouter(prefix="/api/cases", tags=["Cases"])
 
@@ -235,7 +236,7 @@ def _inference_payload(inference: Inference) -> dict:
         "narrative_contribution": inference.narrative_contribution,
         "feature_contribution": inference.feature_contribution,
         "feature_attributions": _json_loads(inference.feature_attributions, default={}),
-        "global_importance": _get_global_importance(config_id),
+        "global_importance": get_global_importance(config_id),
     }
 
 
@@ -256,23 +257,6 @@ def _parse_feature_blobs(case: dict) -> dict:
     case["features"] = _json_loads(case.pop("features_json", None), default={})
     case["entities"] = _json_loads(case.pop("entities_json", None), default={})
     return case
-
-
-def _get_global_importance(config_id: int | None) -> dict[str, float]:
-    if config_id is None:
-        return {}
-
-    with SessionLocal() as db:
-        rows = db.scalars(
-            select(ModelFeatureImportance).where(
-                ModelFeatureImportance.config_id == config_id
-            )
-        ).all()
-
-    return {
-        row.feature_name: row.mean_permutation_importance
-        for row in rows
-    }
 
 
 def _json_loads(value: str | None, default):

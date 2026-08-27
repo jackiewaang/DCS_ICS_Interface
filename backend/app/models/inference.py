@@ -29,6 +29,7 @@ class ModelConfig(Base):
     fusion_type: Mapped[str | None] = mapped_column(Text, default="gated", nullable=True)
     normalise_emb: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
     normalise_case_feats: Mapped[bool | None] = mapped_column(Boolean, default=False, nullable=True)
+    case_feat_names: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     label_config: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     # Paths

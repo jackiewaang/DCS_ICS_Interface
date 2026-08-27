@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Download, Maximize2, Minimize2 } from 'lucide-react';
 import CaseHeader from '@/components/CaseHeader';
 import MainOverviewPanel from '@/components/dashboard/MainOverviewPanel';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
@@ -7,6 +7,8 @@ import HeatmapPanel from '@/components/dashboard/HeatmapPanel';
 import FeaturesPanel from '@/components/dashboard/FeaturesPanel';
 import EntitiesPanel from '@/components/dashboard/EntitiesPanel';
 import { Button } from '@/components/ui/button';
+import useLLMInference from '@/hooks/useLLMInference';
+import { exportAnalysisPdf } from '@/services/exportAnalysisPdf';
 
 const TABS = [
   { id: 'main', label: 'Main' },
@@ -19,6 +21,10 @@ const TABS = [
 export default function InferenceResults({ data }) {
   const [activeTab, setActiveTab] = useState('main');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const llmState = useLLMInference(data?.inference_id);
+  const currentLlmState = llmState.inferenceId === data?.inference_id
+    ? llmState
+    : { inferenceId: data?.inference_id, result: null, status: 'loading', errorMessage: '' };
 
   if (!data) {
     return (
@@ -41,19 +47,30 @@ export default function InferenceResults({ data }) {
 
   return (
     <section className={shellClass}>
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
           Inference results
         </span>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => setIsFullscreen((current) => !current)}
-          className="h-9 gap-2"
-        >
-          {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          {isFullscreen ? 'Exit full screen' : 'Full screen'}
-        </Button>
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => exportAnalysisPdf(data, currentLlmState)}
+            className="h-9 gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export PDF
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsFullscreen((current) => !current)}
+            className="h-9 gap-2"
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isFullscreen ? 'Exit full screen' : 'Full screen'}
+          </Button>
+        </div>
       </div>
 
       <CaseHeader data={data} />
@@ -79,7 +96,7 @@ export default function InferenceResults({ data }) {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         {activeTab === 'main' && <MainOverviewPanel data={data} />}
-        {activeTab === 'ai' && <AIInsightsPanel data={data} />}
+        {activeTab === 'ai' && <AIInsightsPanel data={data} llmState={currentLlmState} />}
         {activeTab === 'heatmap' && <HeatmapPanel data={data} />}
         {activeTab === 'features' && <FeaturesPanel data={data} />}
         {activeTab === 'entities' && <EntitiesPanel data={data} />}

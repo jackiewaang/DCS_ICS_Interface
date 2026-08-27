@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.database.session import SessionLocal
 from app.models.document import DocumentMetadata
 from app.models.inference import Inference, ModelConfig, ModelFeatureImportance
+from app.pipeline.feature_schema import DEFAULT_FEATURE_ORDER
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -19,42 +20,6 @@ SCALER_FILE_SUFFIXES = (".joblib", ".pkl", ".pickle")
 FEATURE_VALIDATION_SUMMARY = "feature_validation_summary.csv"
 CASE_FEATURE_ATTENTION_TEST = "case_feature_attention_test.csv"
 ATTRIBUTION_SUFFIXES = ("_AbsAttribution", "_Attribution")
-DEFAULT_FEATURES = (
-    "Flesch Reading Ease",
-    "Dale-Chall Readability Score",
-    "SMOG Index",
-    "Automated Readability Index",
-    "Sentiment (mean)",
-    "Sentiment (10th)",
-    "Sentiment (50th)",
-    "Sentiment (75th)",
-    "Sentiment (90th)",
-    "Number of organizations mentioned",
-    "Number of named individuals",
-    "Number of countries or regions mentioned",
-    "Word count",
-    "Paragraph count",
-    "PERSON",
-    "NORP",
-    "FAC",
-    "ORG",
-    "GPE",
-    "LOC",
-    "PRODUCT",
-    "EVENT",
-    "WORK_OF_ART",
-    "LAW",
-    "LANGUAGE",
-    "DATE",
-    "TIME",
-    "PERCENT",
-    "MONEY",
-    "QUANTITY",
-    "ORDINAL",
-    "CARDINAL",
-)
-
-
 def seed_models(db: Session | None = None, models_root: Path = MODELS_ROOT) -> int:
     """
     Discover model_config.json files under assets/models and upsert model_configs.
@@ -73,6 +38,7 @@ def seed_models(db: Session | None = None, models_root: Path = MODELS_ROOT) -> i
 
             db_model_config = _upsert_model_config(db, model_config)
             db.flush()
+            _seed_feature_importances(db, db_model_config, config_path.parent)
             seeded_count += 1
 
         if owns_session:
@@ -115,6 +81,9 @@ def _build_model_config(config_path: Path) -> dict[str, Any] | None:
         "fusion_type": config.get("fusion_type") or "gated",
         "normalise_emb": bool(config.get("normalise_emb", False)),
         "normalise_case_feats": bool(config.get("normalise_case_feats", False)),
+        "case_feat_names": list(
+            config.get("case_feat_names") or DEFAULT_FEATURE_ORDER
+        ),
         "label_config": _normalise_label_config(config),
         "model_path": _relative_to_backend(model_path),
         "scaler_path": _relative_to_backend(scaler_path) if scaler_path else None,
@@ -222,7 +191,7 @@ def _seed_feature_importances(
     importances = _read_mean_permutation_importances(importance_path)
 
     if not importances:
-        feature_names = _feature_names_from_case_attention(case_attention_path) or list(DEFAULT_FEATURES)
+        feature_names = _feature_names_from_case_attention(case_attention_path) or list(DEFAULT_FEATURE_ORDER)
         importances = {feature_name: 0.0 for feature_name in feature_names}
 
     existing_rows = {

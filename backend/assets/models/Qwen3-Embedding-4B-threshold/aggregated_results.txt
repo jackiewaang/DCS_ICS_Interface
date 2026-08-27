@@ -1,0 +1,9 @@
+Aggregated Results (mean ± std):
+fold: 1.0000 ± nan
+accuracy: 0.6229 ± nan
+auroc: 0.6699 ± nan
+f1: 0.6431 ± nan
+precision: 0.6071 ± nan
+recall: 0.6836 ± nan
+specificity: 0.5628 ± nan
+balanced_accuracy: 0.6232 ± nan

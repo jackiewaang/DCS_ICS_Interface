@@ -28,7 +28,6 @@ async def generate_review(inference_id):
 
     try:
         result = await generate(messages)
-        print(f"Raw LLM response for inference {inference_id}: {result!r}")
         analysis = _parse_llm_json(result)
 
         return save_llm_inference_completed(
