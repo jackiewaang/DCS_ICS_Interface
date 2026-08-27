@@ -81,6 +81,9 @@ def _build_model_config(config_path: Path) -> dict[str, Any] | None:
         "fusion_type": config.get("fusion_type") or "gated",
         "normalise_emb": bool(config.get("normalise_emb", False)),
         "normalise_case_feats": bool(config.get("normalise_case_feats", False)),
+        "case_feat_names": list(
+            config.get("case_feat_names") or DEFAULT_FEATURE_ORDER
+        ),
         "label_config": _normalise_label_config(config),
         "model_path": _relative_to_backend(model_path),
         "scaler_path": _relative_to_backend(scaler_path) if scaler_path else None,

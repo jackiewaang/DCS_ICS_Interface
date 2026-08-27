@@ -17,15 +17,16 @@ class FeatureVectorBuilder:
     def build(
         self,
         summary_text: str,
+        research_text: str,
         details_text: str,
         config: dict[str, Any],
     ) -> tuple[dict[str, Any], dict[str, list[str]], list[float]]:
         features = self.extractor.extract(
             summary_text=summary_text,
+            research_text=research_text,
             details_text=details_text,
         )
         entities = features.pop(ENTITY_LISTS_KEY, {})
-        self._add_entity_count_features(features, entities)
         ordered_values = self._ordered_values(features, entities, config)
         return features, entities, ordered_values
 
@@ -42,17 +43,6 @@ class FeatureVectorBuilder:
                 value = 0
             values.append(float(value or 0))
         return values
-
-    def _add_entity_count_features(
-        self,
-        features: dict[str, Any],
-        entities: dict[str, list[str]],
-    ) -> None:
-        features["Number of organizations mentioned"] = len(entities.get("ORG", []))
-        features["Number of named individuals"] = len(entities.get("PERSON", []))
-        features["Number of countries or regions mentioned"] = (
-            len(entities.get("GPE", [])) + len(entities.get("LOC", []))
-        )
 
     def _feature_value(
         self,

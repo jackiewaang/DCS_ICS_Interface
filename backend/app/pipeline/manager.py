@@ -10,7 +10,7 @@ from app.pipeline.model_runner import ModelRunner
 from app.repositories.model_config_repository import get_model_config
 
 
-SAVE_EMBEDDINGS_PICKLE = False
+SAVE_EMBEDDINGS_PICKLE = True
 EMBEDDING_SERVER_URL = "http://localhost:8001"
 CLASSIFICATION_PROMPT = (
     "Given a text from a research impact report, classify the research impact "
@@ -50,6 +50,7 @@ class PipelineManager:
 
         features, entities, ordered_features = self.feature_vector_builder.build(
             summary_text=summary_text,
+            research_text=research_text,
             details_text=impact_text,
             config=model_config,
         )

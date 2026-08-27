@@ -2,7 +2,7 @@
 module load Python/3.11.5-GCCcore-13.2.0
 module load CUDA/12.8.0
 
-source ../backend/venv311/bin/activate
+source ./venv-vllm/bin/activate
 
 MODEL="Qwen/Qwen3-4B-Instruct-2507"
 

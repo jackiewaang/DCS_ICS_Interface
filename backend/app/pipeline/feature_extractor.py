@@ -54,9 +54,10 @@ ENTITY_LISTS_KEY = "entities"
 
 class FeatureExtractorEngine:
     def __init__(self):
-        self.nlp = spacy.load("en_core_web_sm")
-        if "sentencizer" not in self.nlp.pipe_names:
-            self.nlp.add_pipe("sentencizer")
+        self.nlp_sm = spacy.load("en_core_web_sm")
+        if "sentencizer" not in self.nlp_sm.pipe_names:
+            self.nlp_sm.add_pipe("sentencizer")
+        self.nlp_trf = spacy.load("en_core_web_trf")
         self.sia = SentimentIntensityAnalyzer()
 
     def estimate_total_monetary_value(self, money_list: list[str]) -> float:
@@ -88,22 +89,28 @@ class FeatureExtractorEngine:
 
         return 0
 
-    def build_feature_text(self, summary_text: str, details_text: str) -> str:
-        return f"{str(summary_text or '')}\n\n{str(details_text or '')}"
+    def build_feature_text(self, summary_text: str, research_text: str, details_text: str) -> str:
+        return f"{str(summary_text or '')}\n\n{str(research_text or '')}\n\n{str(details_text or '')}"
 
     def extract_from_text(self, text: str) -> dict:
+
+        # Remove Excel/XML exports (&#x000D; = carriage return)
+        text = re.sub(r'_x000D_', ' ', text, flags=re.IGNORECASE)
+
         features = {}
 
+        # readability ******************
         features["Flesch Reading Ease"] = textstat.flesch_reading_ease(text)
         features["Dale-Chall Readability Score"] = textstat.dale_chall_readability_score(text)
         features["SMOG Index"] = textstat.smog_index(text)
         features["Automated Readability Index"] = textstat.automated_readability_index(text)
 
-        doc = self.nlp(text)
-        sentences = [sent.text for sent in doc.sents]
+        # sentiment ******************
+        doc_sm = self.nlp_sm(text)
+        sentences = [sent.text for sent in doc_sm.sents]
         sentiments = [
-            self.sia.polarity_scores(sentence)["compound"]
-            for sentence in sentences
+            self.sia.polarity_scores(sent)["compound"]
+            for sent in sentences
         ]
 
         if len(sentiments) >= 2:
@@ -126,33 +133,57 @@ class FeatureExtractorEngine:
             features["Sentiment (75th)"] = 0
             features["Sentiment (90th)"] = 0
 
-        unique_entities = {label: {} for label in SPACY_ENTITY_LABELS}
+        # entities ******************
+        orgs = set()
+        individuals = set()
+        countries_regions = set()
         money_mentions = []
 
-        for ent in doc.ents:
+        for ent in doc_sm.ents:
             entity_text = ent.text.strip()
             if not entity_text:
                 continue
 
-            if ent.label_ in unique_entities:
-                unique_entities[ent.label_].setdefault(entity_text.lower(), entity_text)
-            if ent.label_ == "MONEY":
+            if ent.label_ == "ORG":
+                orgs.add(entity_text)
+            elif ent.label_ == "PERSON":
+                individuals.add(entity_text)
+            elif ent.label_ in {"GPE", "LOC"}:
+                countries_regions.add(entity_text)
+            elif ent.label_ == "MONEY":
                 money_mentions.append(entity_text)
 
+        features["Number of organizations mentioned"] = len(orgs)
+        features["Number of named individuals"] = len(individuals)
+        features["Number of countries or regions mentioned"] = len(countries_regions)
         features["Any monetary values mentioned (list them with currency)"] = "; ".join(money_mentions)
         features["Total monetary value"] = self.estimate_total_monetary_value(money_mentions)
-        features["Word count"] = len(text.split())
-        features["Paragraph count"] = text.count("\n\n") + 1
+
+        doc_trf = self.nlp_trf(text)
+        unique_entities = {label: {} for label in SPACY_ENTITY_LABELS}
+
+        for ent in doc_trf.ents:
+            entity_text = ent.text.strip()
+            if entity_text and ent.label_ in unique_entities:
+                unique_entities[ent.label_].setdefault(
+                    entity_text.lower(),
+                    entity_text,
+                )
 
         features[ENTITY_LISTS_KEY] = {
             label: list(entities.values())
             for label, entities in unique_entities.items()
         }
 
+        # counts ***********************
+        features["Word count"] = len(text.split())
+
+        features["Paragraph count"] = text.count("\n\n") + 1
+
         return features
 
-    def extract(self, summary_text: str, details_text: str) -> dict:
-        text = self.build_feature_text(summary_text, details_text)
+    def extract(self, summary_text: str, research_text: str, details_text: str) -> dict:
+        text = self.build_feature_text(summary_text, research_text, details_text)
         return self.extract_from_text(text)
 
 

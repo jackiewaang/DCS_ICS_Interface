@@ -13,6 +13,7 @@ DEFAULT_FEATURE_ORDER = (
     "Number of organizations mentioned",
     "Number of named individuals",
     "Number of countries or regions mentioned",
+    "Total monetary value",
     "Word count",
     "Paragraph count",
     "PERSON",

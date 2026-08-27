@@ -3,6 +3,7 @@
 from typing import Any
 
 import joblib
+import numpy as np
 import torch
 
 from app.pipeline.attention_mil import AttentionMIL
@@ -26,10 +27,14 @@ class ModelRunner:
         feature_tensor = None
 
         if ordered_features:
+            raw_features = np.asarray(
+                ordered_features,
+                dtype=np.float32,
+            ).reshape(1, -1)
             features = (
-                scaler.transform([ordered_features])[0]
+                scaler.transform(raw_features)[0]
                 if scaler
-                else ordered_features
+                else raw_features[0]
             )
 
             feature_tensor = torch.tensor(features, dtype=torch.float32).to(self.device)
@@ -45,19 +50,20 @@ class ModelRunner:
                 feature_importance
             ) = model(embedding_tensor, case_features=feature_tensor)
 
-        score = round(float(prediction.item()), 4)
+        score = float(prediction.item())
+        classification_threshold = float(config.get("classif_thresh", 0.5))
 
         return {
             "score": score,
-            "label": "High Impact" if score >= 0.5 else "Low Impact",
+            "label": "High Impact" if score > classification_threshold else "Low Impact",
             "attention": attention.detach().view(-1).cpu().numpy().tolist(),
             "feature_gates": (
                 gates.detach().view(-1).cpu().numpy().tolist()
                 if gates is not None
                 else []
             ),
-            "narrative_contribution": round(float(text_importance.item()), 4),
-            "feature_contribution": round(float(feature_importance.item()), 4),
+            "narrative_contribution": float(text_importance.item()),
+            "feature_contribution": float(feature_importance.item()),
         }
 
     def _get_assets(self, config: dict[str, Any]) -> tuple[AttentionMIL, Any]:

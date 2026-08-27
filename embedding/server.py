@@ -56,6 +56,7 @@ def embed(request: EmbeddingRequest):
 
     embeddings = model.encode(request.texts, prompt=request.prompt, batch_size=bs)
 
+    embeddings = embeddings.astype("float32")
     return EmbeddingResponse(
         embeddings=embeddings.tolist()
     )
