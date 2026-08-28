@@ -1,5 +1,6 @@
 # Loads and caches trained AttentionMIL assets, then runs local model inference.
 
+import logging
 from typing import Any
 
 import joblib
@@ -7,6 +8,9 @@ import numpy as np
 import torch
 
 from app.pipeline.attention_mil import AttentionMIL
+
+
+logger = logging.getLogger(__name__)
 
 
 class ModelRunner:
@@ -69,8 +73,14 @@ class ModelRunner:
     def _get_assets(self, config: dict[str, Any]) -> tuple[AttentionMIL, Any]:
         config_id = config["config_id"]
         if config_id in self.loaded_models:
+            logger.info("Using cached model assets: config_id=%s", config_id)
             return self.loaded_models[config_id], self.loaded_scalers.get(config_id)
 
+        logger.info(
+            "Loading model assets: config_id=%s device=%s",
+            config_id,
+            self.device,
+        )
         scaler = joblib.load(config["scaler_path"]) if config.get("scaler_path") else None
         feature_dim = config["feature_dim"] if config.get("use_features") else None
 
@@ -89,4 +99,5 @@ class ModelRunner:
 
         self.loaded_models[config_id] = model
         self.loaded_scalers[config_id] = scaler
+        logger.info("Model assets loaded and cached: config_id=%s", config_id)
         return model, scaler

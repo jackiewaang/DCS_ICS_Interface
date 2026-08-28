@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Any
 
 from app.clients.embedding_client import EmbeddingClient
@@ -9,6 +11,8 @@ from app.pipeline.model_config_resolver import ModelConfigResolver
 from app.pipeline.model_runner import ModelRunner
 from app.repositories.model_config_repository import get_model_config
 
+
+logger = logging.getLogger(__name__)
 
 SAVE_EMBEDDINGS_PICKLE = True
 EMBEDDING_SERVER_URL = "http://localhost:8001"
@@ -41,6 +45,29 @@ class PipelineManager:
         config_id: int | str | None = None,
         config: dict[str, Any] | ModelConfig | None = None,
     ) -> dict[str, Any]:
+        started_at = time.monotonic()
+        logger.info("Inference pipeline started: config_id=%s", config_id)
+
+        try:
+            result = self._run_inference(sections, config_id, config)
+        except Exception:
+            logger.exception("Inference pipeline failed: config_id=%s", config_id)
+            raise
+
+        logger.info(
+            "Inference pipeline completed: config_id=%s sentences=%d duration_seconds=%.3f",
+            result["model"]["config_id"],
+            len(result["sentences"]),
+            time.monotonic() - started_at,
+        )
+        return result
+
+    def _run_inference(
+        self,
+        sections: dict[str, str],
+        config_id: int | str | None,
+        config: dict[str, Any] | ModelConfig | None,
+    ) -> dict[str, Any]:
         model_config = self.model_config_resolver.normalise(
             config or get_model_config(config_id)
         )
@@ -54,6 +81,12 @@ class PipelineManager:
             details_text=impact_text,
             config=model_config,
         )
+        logger.info(
+            "Feature extraction completed: config_id=%s features=%d entity_types=%d",
+            model_config.get("config_id"),
+            len(features),
+            len(entities),
+        )
 
         sentences = self.embedding_preprocessor.prepare_sentences(
             summary=summary_text,
@@ -63,6 +96,11 @@ class PipelineManager:
         if not sentences:
             raise ValueError("No text was available to embed for inference.")
 
+        logger.info(
+            "Requesting embeddings: config_id=%s sentences=%d",
+            model_config.get("config_id"),
+            len(sentences),
+        )
         embeddings = self.embedding_client.embed(
             texts=sentences,
             prompt=CLASSIFICATION_PROMPT,
@@ -71,6 +109,11 @@ class PipelineManager:
             raise ValueError("The embedding server returned no embeddings.")
         if len(embeddings) != len(sentences):
             raise ValueError("The embedding count does not match the sentence count.")
+        logger.info(
+            "Embeddings received: config_id=%s embeddings=%d",
+            model_config.get("config_id"),
+            len(embeddings),
+        )
 
         embeddings_path = None
         if SAVE_EMBEDDINGS_PICKLE:
@@ -80,6 +123,7 @@ class PipelineManager:
                 model_config,
                 sections,
             )
+            logger.info("Embedding artifact saved: path=%s", embeddings_path)
         if model_config["input_dim"] is None:
             model_config["input_dim"] = len(embeddings[0])
 
