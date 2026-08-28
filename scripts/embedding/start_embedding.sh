@@ -1,11 +1,13 @@
 #!/bin/bash
 set -e
 
+export CUDA_VISIBLE_DEVICES=0
+
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 APP_DIR="$REPO_ROOT/embedding"
 
-module load Python/3.11.5-GCCcore-13.2.0
-module load CUDA/12.8.0
+#module load Python/3.11.5-GCCcore-13.2.0
+#module load CUDA/12.8.0
 source "$APP_DIR/venv-embedding/bin/activate"
 
 set -a
