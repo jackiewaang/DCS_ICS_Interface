@@ -1,9 +1,10 @@
 # Sends API calls to the LLM server and returns the LLM response
+import os
 from openai import AsyncOpenAI
 
 client = AsyncOpenAI(
     api_key="EMPTY",
-    base_url="http://localhost:8000/v1"
+    base_url=os.getenv("VLLM_BASE_URL")
 )
 
 async def generate(messages):

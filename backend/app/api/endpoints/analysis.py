@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -18,6 +19,8 @@ from app.models.inference import (
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
 from app.retention import user_analysis_expiry
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
@@ -203,7 +206,7 @@ async def _run_llm_review(inference_id: int) -> None:
     try:
         await generate_review(inference_id)
     except Exception:
-        pass
+        logger.exception("LLM review failed: inference_id=%s", inference_id)
 
 
 def _normalise_title(value: str | None) -> str:

@@ -1,6 +1,7 @@
 # Hosts the embedding model behind a minimal FastAPI text-to-vector service.
 
 import os
+import torch
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     model = SentenceTransformer(
         MODEL_NAME,
         device="cuda",
+        model_kwargs={"torch_dtype": torch.float16},
         token=os.getenv("HF_TOKEN") if is_qwen else None,
         trust_remote_code=is_qwen
     )

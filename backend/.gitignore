@@ -1,4 +1,4 @@
 database.db
-venv311
 embeddings
-database2008db.txt
+logs
+venv-backend

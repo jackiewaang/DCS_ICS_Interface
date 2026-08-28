@@ -1,26 +1,30 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.api.endpoints.analysis import router as analysis_router
 from app.api.endpoints.cases import router as cases_router
 from app.api.endpoints.feedback import router as feedback_router
-from app.api.endpoints.seeding import router as seeding_router
 from app.database import init_db
+from app.logging_config import configure_logging
 from app.retention import (
     start_cleanup_task,
     stop_cleanup_task,
 )
 
+configure_logging()
+logger = logging.getLogger(__name__)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Checking database tables...")
+    logger.info("Starting backend and checking database tables")
     init_db()
     cleanup_task = start_cleanup_task()
     try:
         yield
     finally:
         await stop_cleanup_task(cleanup_task)
-        print("Shutting down...")
+        logger.info("Backend shutdown complete")
 
 app = FastAPI(
     title="The Language of REF API",
@@ -38,7 +42,6 @@ app.add_middleware(
 app.include_router(cases_router)
 app.include_router(analysis_router)
 app.include_router(feedback_router)
-app.include_router(seeding_router)
 
 @app.get("/")
 def read_root():
