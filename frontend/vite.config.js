@@ -12,7 +12,7 @@ export default defineConfig({
     }
   },
   server: {
-    allowedHosts: [""],
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: "http://localhost:8000",
