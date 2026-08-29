@@ -8,7 +8,7 @@ FRONTEND_DIR="$REPO_ROOT/frontend"
 cd "$FRONTEND_DIR"
 npm run build
 mkdir -p "$HOME/apache/htdocs"
-cp -rf dist "$HOME/apache/htdocs/"
+cp -rf dist/* "$HOME/apache/htdocs/"
 
 # module load Python/3.11.5-GCCcore-13.2.0 - uncomment to load Python module if not loaded
 source "$APP_DIR/venv-backend/bin/activate"
