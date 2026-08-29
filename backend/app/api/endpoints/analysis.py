@@ -1,8 +1,11 @@
 import asyncio
 import json
 import logging
+from datetime import datetime, timezone
+from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
@@ -24,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
+LOGS_DIR = Path(__file__).resolve().parents[4] / "logs"
 
 
 class InferenceSections(BaseModel):
@@ -52,7 +56,11 @@ def list_models():
 
 
 @router.post("/inference")
-async def run_inference(config_id: int, sections: InferenceSections):
+async def run_inference(
+    config_id: int,
+    sections: InferenceSections,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
     section_payload = sections.model_dump()
     output = pipeline_manager.run_inference(
         section_payload,
@@ -62,6 +70,7 @@ async def run_inference(config_id: int, sections: InferenceSections):
         config_id=config_id,
         feature_names=output.get("feature_names", []),
     )
+    _log_inference(user_id, config_id, sections, output["score"])
     output.update(_save_inference_output(
         config_id=config_id,
         sections=sections,
@@ -71,6 +80,28 @@ async def run_inference(config_id: int, sections: InferenceSections):
     asyncio.create_task(_run_llm_review(output["inference_id"]))
 
     return output
+
+
+def _log_inference(
+    user_id: UUID,
+    config_id: int,
+    sections: InferenceSections,
+    score: float,
+) -> None:
+    user_dir = LOGS_DIR / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "config_id": config_id,
+        "inputs": {
+            "summary": sections.summary,
+            "research": sections.research,
+            "impact": sections.impact,
+        },
+        "output": {"prediction_score": score},
+    }
+    with (user_dir / "inferences.jsonl").open("a", encoding="utf-8") as log_file:
+        log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 @router.get("/llm-inference/{inference_id}")
