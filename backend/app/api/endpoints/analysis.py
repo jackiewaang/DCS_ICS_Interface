@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
-LOGS_DIR = Path(__file__).resolve().parents[4] / "logs"
+LOGS_DIR = Path(__file__).resolve().parents[4] / "logs-users"
 
 
 class InferenceSections(BaseModel):
