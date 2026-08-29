@@ -9,6 +9,7 @@ function StatusBanner({ status, errorMessage }) {
 
   return (
     <div
+      role={isError ? 'alert' : 'status'}
       className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
         isError
           ? 'border-destructive/30 bg-destructive/5 text-destructive'

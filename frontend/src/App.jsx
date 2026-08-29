@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./services/api";
 import { Bot, Cpu, Database, History as HistoryIcon, Upload, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import FeedbackPage from "./pages/FeedbackPage";
@@ -7,6 +7,7 @@ import InferenceHistoryPage from "./pages/InferenceHistoryPage";
 import ModelConfigsPage from "./pages/ModelConfigsPage";
 import UploadPage from "./pages/UploadPage";
 import NavItem from "./components/ui/NavItem";
+import { getUserErrorMessage } from "./helper/error_messages";
 
 export default function App() {
   const [currentView, setCurrentView] = useState("upload");
@@ -21,33 +22,57 @@ export default function App() {
     embedding_model: null,
     llm_model: null,
   });
+  const [runtimeModelsError, setRuntimeModelsError] = useState("");
+  const modelsRequestId = useRef(0);
+  const runtimeModelsRequestId = useRef(0);
+
+  const fetchModels = useCallback(async () => {
+    const requestId = ++modelsRequestId.current;
+    setIsModelsLoading(true);
+    setModelsError("");
+    try {
+      const data = await api.getConfigs();
+      if (!Array.isArray(data)) throw new Error("The model list returned by the service is invalid.");
+      if (requestId !== modelsRequestId.current) return;
+      setModels(data);
+      setActiveConfigId((current) => {
+        if (data.some((model) => String(model.config_id) === current)) return current;
+        return data[0]?.config_id?.toString() || "";
+      });
+    } catch (err) {
+      if (requestId !== modelsRequestId.current) return;
+      setModels([]);
+      setActiveConfigId("");
+      setModelsError(getUserErrorMessage(err, "Model configurations could not be loaded."));
+      console.error("Failed to load models:", err);
+    } finally {
+      if (requestId === modelsRequestId.current) setIsModelsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const data = await api.getConfigs();
-        setModels(data);
-        if (data.length > 0) setActiveConfigId(data[0].config_id.toString());
-      } catch (err) {
-        setModelsError(err.message || "Model configurations could not be loaded.");
-        console.error("Failed to load models:", err.message);
-      } finally {
-        setIsModelsLoading(false);
-      }
-    };
     fetchModels();
+  }, [fetchModels]);
+
+  const fetchRuntimeModels = useCallback(async () => {
+    const requestId = ++runtimeModelsRequestId.current;
+    setRuntimeModelsError("");
+    try {
+      const data = await api.getRuntimeModels();
+      if (!data || typeof data !== "object") throw new Error("Runtime model information is invalid.");
+      if (requestId !== runtimeModelsRequestId.current) return;
+      setRuntimeModels(data);
+    } catch (err) {
+      if (requestId !== runtimeModelsRequestId.current) return;
+      setRuntimeModels({ embedding_model: null, llm_model: null });
+      setRuntimeModelsError(getUserErrorMessage(err, "Runtime model information could not be loaded."));
+      console.error("Failed to load runtime model information:", err);
+    }
   }, []);
 
   useEffect(() => {
-    const fetchRuntimeModels = async () => {
-      try {
-        setRuntimeModels(await api.getRuntimeModels());
-      } catch (err) {
-        console.error("Failed to load runtime model information:", err.message);
-      }
-    };
     fetchRuntimeModels();
-  }, []);
+  }, [fetchRuntimeModels]);
 
   const handleAnalysisUpdate = useCallback((result) => {
     setInferenceHistory((current) => {
@@ -116,8 +141,8 @@ export default function App() {
             Runtime Models
           </p>
           <div className="mt-4 space-y-3">
-            <RuntimeModelCard icon={Cpu} label="Embedding" value={runtimeModels.embedding_model} />
-            <RuntimeModelCard icon={Bot} label="LLM" value={runtimeModels.llm_model} />
+            <RuntimeModelCard icon={Cpu} label="Embedding" value={runtimeModels.embedding_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
+            <RuntimeModelCard icon={Bot} label="LLM" value={runtimeModels.llm_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
             <label className="block rounded-md border border-sidebar-border bg-sidebar-accent p-3">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                 Inference engine
@@ -153,6 +178,10 @@ export default function App() {
           <UploadPage 
             onAnalysisComplete={handleAnalysisUpdate}
             activeConfigId={activeConfigId}
+            modelsError={modelsError || (!isModelsLoading && models.length === 0
+              ? "No inference models are currently registered."
+              : "")}
+            onRetryModels={fetchModels}
           />
         )}
         {currentView === "models" && (
@@ -160,6 +189,7 @@ export default function App() {
             models={models}
             isLoading={isModelsLoading}
             error={modelsError}
+            onRetry={fetchModels}
           />
         )}
         {currentView === "feedback" && <FeedbackPage />}

@@ -1,14 +1,52 @@
 const API_BASE = "/api";
 const USER_ID_KEY = "user_id";
-const USER_ID = localStorage.getItem(USER_ID_KEY) || crypto.randomUUID();
-localStorage.setItem(USER_ID_KEY, USER_ID);
+
+function createUserId() {
+  const generatedId = globalThis.crypto?.randomUUID?.()
+    || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  try {
+    const storedId = localStorage.getItem(USER_ID_KEY);
+    if (storedId) return storedId;
+    localStorage.setItem(USER_ID_KEY, generatedId);
+  } catch (error) {
+    console.warn('Session identifier could not be persisted:', error);
+  }
+
+  return generatedId;
+}
+
+const USER_ID = createUserId();
+
+function errorDetail(payload, status) {
+  const detail = payload?.detail ?? payload?.message;
+  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => item?.msg || item?.message).filter(Boolean);
+    if (messages.length) return messages.join(' ');
+  }
+  return `The analysis service returned an error (${status}). Please try again.`;
+}
 
 async function handleResponse(response) {
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: "Unknown Error" }));
-        throw new Error(error.detail || `HTTP Error: ${response.status}`);
+  const rawBody = await response.text();
+  let payload = null;
+
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      if (response.ok) {
+        throw new Error('The analysis service returned an unreadable response. Please try again.');
+      }
     }
-    return response.json();
+  }
+
+  if (!response.ok) {
+    throw new Error(errorDetail(payload, response.status));
+  }
+
+  return payload;
 }
 
 function cleanText(value) {
@@ -16,8 +54,17 @@ function cleanText(value) {
 }
 
 function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
-  const featureNames = output.feature_names || [];
-  const featureGates = output.feature_gates || [];
+  if (!output || typeof output !== "object" || Array.isArray(output)) {
+    throw new Error("The inference service returned an invalid result. Please try again.");
+  }
+
+  const score = Number(output.score);
+  if (!Number.isFinite(score)) {
+    throw new Error("The inference result did not include a valid prediction score. Please try again.");
+  }
+
+  const featureNames = Array.isArray(output.feature_names) ? output.feature_names : [];
+  const featureGates = Array.isArray(output.feature_gates) ? output.feature_gates : [];
   const featureAttributions = Object.fromEntries(
     featureNames.map((name, index) => [name, Number(featureGates[index] || 0)])
   );
@@ -34,12 +81,12 @@ function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
     ground_truth: null,
     gpa: null,
     true_label: null,
-    score: Number(output.score ?? 0),
-    label: output.label || (Number(output.score ?? 0) >= 0.5 ? "High Impact" : "Low Impact"),
-    attention: output.attention || [],
-    sentences: output.sentences || [],
-    model_prediction: Number(output.score ?? 0),
-    prediction_label: output.label || (Number(output.score ?? 0) >= 0.5 ? "High Impact" : "Low Impact"),
+    score,
+    label: output.label || (score >= 0.5 ? "High Impact" : "Low Impact"),
+    attention: Array.isArray(output.attention) ? output.attention : [],
+    sentences: Array.isArray(output.sentences) ? output.sentences : [],
+    model_prediction: score,
+    prediction_label: output.label || (score >= 0.5 ? "High Impact" : "Low Impact"),
     model_label: output.label,
     model_name: output.model?.name || "Selected model",
     input_granularity: output.model?.input_granularity,
@@ -48,17 +95,17 @@ function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
     inference_time_ms: output.inference_time_ms ?? output.inference_time ?? output.elapsed_ms ?? null,
     config_id: output.model?.config_id || configId,
     sections: draft.sections || {},
-    heatmap: (output.heatmap || []).map((item) => ({
+    heatmap: (Array.isArray(output.heatmap) ? output.heatmap : []).map((item) => ({
       sentence_text: item.sentence_text || item.sentence || "",
       attention_score: Number(item.attention_score ?? item.attention ?? 0),
     })),
-    features: output.features || {},
-    entities: output.entities || {},
-    ordered_features: output.ordered_features || [],
+    features: output.features && typeof output.features === "object" ? output.features : {},
+    entities: output.entities && typeof output.entities === "object" ? output.entities : {},
+    ordered_features: Array.isArray(output.ordered_features) ? output.ordered_features : [],
     feature_names: featureNames,
     feature_gates: featureGates,
-    feature_attributions: output.feature_attributions || featureAttributions,
-    global_importance: output.global_importance || {},
+    feature_attributions: output.feature_attributions && typeof output.feature_attributions === "object" ? output.feature_attributions : featureAttributions,
+    global_importance: output.global_importance && typeof output.global_importance === "object" ? output.global_importance : {},
     llm_input: output.llm_input || null,
   };
 }

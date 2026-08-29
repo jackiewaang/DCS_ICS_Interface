@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
+import { getUserErrorMessage } from '@/helper/error_messages';
 
 const LLM_TIMEOUT_MS = 305_000;
 
@@ -42,7 +43,7 @@ export default function useLLMFeedback(llmInput) {
             status: 'error',
             errorMessage: didTimeout
               ? 'AI insight generation timed out after five minutes.'
-              : error.message,
+              : getUserErrorMessage(error, 'AI insights could not be generated. Please try again later.'),
           });
         }
       });

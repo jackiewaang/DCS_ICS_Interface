@@ -101,7 +101,7 @@ export default function SectionEditor({
               </div>
 
               {error && (
-                <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
+                <div role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
                   <p className="text-sm font-medium text-destructive">{error}</p>
                 </div>
               )}
@@ -134,7 +134,7 @@ export default function SectionEditor({
               </div>
 
               {inferenceError && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
+                <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3">
                   <p className="text-sm font-medium text-destructive">{inferenceError}</p>
                 </div>
               )}

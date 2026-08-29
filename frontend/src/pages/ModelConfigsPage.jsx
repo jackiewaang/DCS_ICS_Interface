@@ -1,4 +1,5 @@
 import { Braces, Database, Loader2 } from "lucide-react";
+import ErrorAlert from "@/components/ui/ErrorAlert";
 
 const FIELD_LABELS = {
   config_id: "Configuration ID",
@@ -57,7 +58,7 @@ function ModelValue({ value }) {
   return <span className="break-all">{String(value)}</span>;
 }
 
-export default function ModelConfigsPage({ models, isLoading, error }) {
+export default function ModelConfigsPage({ models, isLoading, error, onRetry }) {
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-6 md:p-8">
       <header className="space-y-2 border-b border-border pb-5">
@@ -86,9 +87,7 @@ export default function ModelConfigsPage({ models, isLoading, error }) {
       )}
 
       {!isLoading && error && (
-        <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
-          {error}
-        </div>
+        <ErrorAlert title="Model configurations could not be loaded" message={error} onRetry={onRetry} />
       )}
 
       {!isLoading && !error && models.length === 0 && (

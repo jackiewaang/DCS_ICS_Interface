@@ -7,8 +7,10 @@ import HeatmapPanel from '@/components/dashboard/HeatmapPanel';
 import FeaturesPanel from '@/components/dashboard/FeaturesPanel';
 import EntitiesPanel from '@/components/dashboard/EntitiesPanel';
 import { Button } from '@/components/ui/button';
+import ErrorAlert from '@/components/ui/ErrorAlert';
 import useLLMFeedback from '@/hooks/useLLMFeedback';
 import { exportAnalysisPdf } from '@/services/exportAnalysisPdf';
+import { getUserErrorMessage } from '@/helper/error_messages';
 
 const TABS = [
   { id: 'main', label: 'Main' },
@@ -21,6 +23,7 @@ const TABS = [
 export default function InferenceResults({ data, onResultUpdate }) {
   const [activeTab, setActiveTab] = useState('main');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [exportError, setExportError] = useState('');
   const savedLlmState = data?.llm_feedback;
   const hasSavedFeedback = ['completed', 'error'].includes(savedLlmState?.status);
   const generatedLlmState = useLLMFeedback(hasSavedFeedback ? null : data?.llm_input);
@@ -50,6 +53,16 @@ export default function InferenceResults({ data, onResultUpdate }) {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFullscreen]);
+
+  const handleExport = () => {
+    setExportError('');
+    try {
+      exportAnalysisPdf(data, llmState);
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      setExportError(getUserErrorMessage(error, 'The PDF could not be created. Please try again.'));
+    }
+  };
 
   if (!data) {
     return (
@@ -90,7 +103,7 @@ export default function InferenceResults({ data, onResultUpdate }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => exportAnalysisPdf(data, llmState)}
+            onClick={handleExport}
             className="h-9 gap-2 cursor-pointer"
           >
             <Download className="h-4 w-4" />
@@ -98,6 +111,17 @@ export default function InferenceResults({ data, onResultUpdate }) {
           </Button>
         </div>
       </div>
+
+      {exportError ? (
+        <div className="border-b border-border px-5 py-3">
+          <ErrorAlert
+            title="PDF export failed"
+            message={exportError}
+            onRetry={handleExport}
+            onDismiss={() => setExportError('')}
+          />
+        </div>
+      ) : null}
 
       <CaseHeader data={data} />
 

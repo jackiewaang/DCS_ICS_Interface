@@ -3,6 +3,8 @@ import { FilePlus2 } from 'lucide-react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
 import SectionEditor from '@/components/SectionEditor';
+import ErrorAlert from '@/components/ui/ErrorAlert';
+import { getUserErrorMessage } from '@/helper/error_messages';
 
 const SECTION_FIELDS = [
   {
@@ -50,7 +52,7 @@ function hasSectionText(sections) {
   return Boolean(sections.summary || sections.research || sections.impact);
 }
 
-export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
+export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsError, onRetryModels }) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
@@ -79,6 +81,15 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
       setDraft(EMPTY_DRAFT);
       setInferenceResult(null);
       setError('Only PDF files are supported.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (selectedFile.size === 0) {
+      setFile(null);
+      setDraft(EMPTY_DRAFT);
+      setInferenceResult(null);
+      setError('The selected PDF is empty. Choose a valid case-study file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -114,7 +125,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
       setInferenceResult(null);
     } catch (err) {
       console.error('Upload Error:', err);
-      setError(err.message || 'Could not extract REF sections from the uploaded PDF.');
+      setError(getUserErrorMessage(err, 'Could not extract REF sections from the uploaded PDF.'));
     } finally {
       setIsUploading(false);
     }
@@ -143,7 +154,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
       setCollapsedSections(COLLAPSED_SECTIONS);
     } catch (err) {
       console.error('Inference Error:', err);
-      setInferenceError(err.message || 'Could not run inference for the current draft.');
+      setInferenceError(getUserErrorMessage(err, 'Could not run inference for the current draft.'));
     } finally {
       setIsRunningInference(false);
     }
@@ -198,6 +209,14 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
           </div>
         </div>
       </header>
+
+      {modelsError ? (
+        <ErrorAlert
+          title="Inference models are unavailable"
+          message={modelsError}
+          onRetry={onRetryModels}
+        />
+      ) : null}
 
       <div className={`grid min-h-0 flex-1 items-stretch gap-5 ${isEditorCollapsed ? 'grid-cols-[4rem_minmax(0,1fr)]' : 'grid-cols-1 xl:grid-cols-[minmax(28rem,0.86fr)_minmax(0,1.14fr)]'}`}>
         <SectionEditor

@@ -3,6 +3,7 @@ import { CheckCircle2, MessageSquareText, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { api } from "@/services/api";
+import { getUserErrorMessage } from "@/helper/error_messages";
 
 const MAX_COMMENTS_LENGTH = 5000;
 const LIKERT_VALUES = [1, 2, 3, 4, 5];
@@ -81,7 +82,8 @@ export default function FeedbackPage() {
       setFeedback(INITIAL_FEEDBACK);
       setIsSubmitted(true);
     } catch (err) {
-      setError(err.message || "Feedback could not be submitted. Please try again.");
+      console.error("Feedback submission failed:", err);
+      setError(getUserErrorMessage(err, "Feedback could not be submitted. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
