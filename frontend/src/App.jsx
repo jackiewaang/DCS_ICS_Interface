@@ -126,7 +126,7 @@ export default function App() {
                 value={activeConfigId}
                 onChange={(event) => setActiveConfigId(event.target.value)}
                 disabled={isModelsLoading || models.length === 0}
-                className="mt-2 w-full rounded-md border border-sidebar-border bg-sidebar px-2.5 py-2 text-xs text-sidebar-foreground outline-none focus:ring-2 focus:ring-sidebar-ring disabled:opacity-60"
+                className="mt-2 w-full cursor-pointer rounded-md border border-sidebar-border bg-sidebar px-2.5 py-2 text-xs text-sidebar-foreground outline-none focus:ring-2 focus:ring-sidebar-ring disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {models.length === 0 ? <option value="">Unavailable</option> : null}
                 {models.map((model) => (

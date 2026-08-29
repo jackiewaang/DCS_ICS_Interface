@@ -30,5 +30,16 @@ export function getObservedRange(rows, key) {
     return 'N/A';
   }
 
-  return `${Math.min(...values).toFixed(4)} - ${Math.max(...values).toFixed(4)}`;
+  return `${formatWeight(Math.min(...values))} - ${formatWeight(Math.max(...values))}`;
+}
+
+export function formatWeight(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return 'N/A';
+  }
+
+  return number !== 0 && Math.abs(number) < 0.0001
+    ? number.toExponential(3)
+    : number.toFixed(4);
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, Maximize2, Minimize2 } from 'lucide-react';
 import CaseHeader from '@/components/CaseHeader';
 import MainOverviewPanel from '@/components/dashboard/MainOverviewPanel';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
@@ -20,6 +20,7 @@ const TABS = [
 
 export default function InferenceResults({ data, onResultUpdate }) {
   const [activeTab, setActiveTab] = useState('main');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const savedLlmState = data?.llm_feedback;
   const hasSavedFeedback = ['completed', 'error'].includes(savedLlmState?.status);
   const generatedLlmState = useLLMFeedback(hasSavedFeedback ? null : data?.llm_input);
@@ -40,6 +41,16 @@ export default function InferenceResults({ data, onResultUpdate }) {
     });
   }, [data, generatedLlmState, hasSavedFeedback, onResultUpdate]);
 
+  useEffect(() => {
+    if (!isFullscreen) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
   if (!data) {
     return (
       <section className="flex h-full min-h-96 items-center justify-center rounded-lg border border-dashed border-border bg-white p-8 text-center shadow-sm">
@@ -56,7 +67,11 @@ export default function InferenceResults({ data, onResultUpdate }) {
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-white shadow-sm">
+    <section className={`flex min-h-0 flex-col overflow-hidden border border-border bg-white shadow-sm ${
+      isFullscreen
+        ? 'fixed inset-0 z-50 h-screen rounded-none'
+        : 'h-full min-h-[36rem] rounded-lg'
+    }`}>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white px-5 py-4">
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
           Inference results
@@ -65,8 +80,18 @@ export default function InferenceResults({ data, onResultUpdate }) {
           <Button
             type="button"
             variant="outline"
+            size="icon"
+            onClick={() => setIsFullscreen((current) => !current)}
+            aria-label={isFullscreen ? 'Exit fullscreen inference results' : 'View inference results fullscreen'}
+            title={isFullscreen ? 'Exit fullscreen (Esc)' : 'View fullscreen'}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
             onClick={() => exportAnalysisPdf(data, llmState)}
-            className="h-9 gap-2"
+            className="h-9 gap-2 cursor-pointer"
           >
             <Download className="h-4 w-4" />
             Export PDF

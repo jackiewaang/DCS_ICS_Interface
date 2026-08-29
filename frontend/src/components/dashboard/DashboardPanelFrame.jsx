@@ -6,7 +6,7 @@ export function DashboardHelp({ text }) {
       <button
         type="button"
         aria-label="Show more information"
-        className="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
+        className="inline-flex cursor-pointer items-center text-muted-foreground transition-colors hover:text-foreground"
       >
         <CircleHelp className="h-4 w-4" />
       </button>

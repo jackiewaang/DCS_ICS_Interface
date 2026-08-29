@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { getObservedRange } from '@/helper/analysis_display';
+import { formatWeight, getObservedRange } from '@/helper/analysis_display';
 import { decodeHTML } from '@/helper/utils';
 import { METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_definitions';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
@@ -102,13 +102,13 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
                   <td className="px-4 py-4 text-sm text-muted-foreground">{row.interpretation}</td>
                   {/* <td className="px-4 py-4 text-sm text-muted-foreground">{row.range}</td> */}
                   {/* <td className="px-4 py-4 text-sm text-muted-foreground">{row.bestRange}</td> */}
-                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.localRaw.toFixed(4)}</td>
-                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.globalRaw.toFixed(4)}</td>
+                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.localRaw)}</td>
+                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.globalRaw)}</td>
                   <td className="px-4 py-4">
                     <button
                       type="button"
                       onClick={() => setActiveCategory(isActive ? null : row.id)}
-                      className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
                     >
                       {isActive ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {isActive ? 'Hide list' : 'Show list'}

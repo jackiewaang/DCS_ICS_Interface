@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { FilePlus2 } from 'lucide-react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
 import SectionEditor from '@/components/SectionEditor';
@@ -182,13 +183,20 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
 
   return (
     <div className="flex min-h-full w-full flex-col gap-6 p-6 md:p-8">
-      <header className="shrink-0 space-y-2 border-b border-border pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[2rem]">
-          New Case Draft
-        </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Upload a PDF, edit the extracted REF sections, then run inference with the active model.
-        </p>
+      <header className="shrink-0 border-b border-border pb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <FilePlus2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[2rem]">
+              New Case Draft
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Upload a PDF, edit the extracted REF sections, then run inference with the active model.
+            </p>
+          </div>
+        </div>
       </header>
 
       <div className={`grid min-h-0 flex-1 items-stretch gap-5 ${isEditorCollapsed ? 'grid-cols-[4rem_minmax(0,1fr)]' : 'grid-cols-1 xl:grid-cols-[minmax(28rem,0.86fr)_minmax(0,1.14fr)]'}`}>

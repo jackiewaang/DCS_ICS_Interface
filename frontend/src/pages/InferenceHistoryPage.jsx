@@ -13,9 +13,9 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect, on
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-5 p-6 md:p-8">
-      <header className="shrink-0 border-b border-border pb-5">
+      <header className="flex shrink-0 flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <History className="h-5 w-5" />
           </div>
           <div>
@@ -27,14 +27,14 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect, on
             </p>
           </div>
         </div>
-        <div className="mt-4 max-w-5xl rounded-md border border-border bg-white px-4 py-3 text-xs leading-relaxed text-muted-foreground">
+        <aside className="max-w-2xl rounded-md border border-border bg-white px-4 py-3 text-xs leading-relaxed text-muted-foreground lg:ml-auto">
           <p>
             Analysis results are not stored as database cases and are cleared from the browser when the page is refreshed. Submitted text, model outputs, and usage activity are logged for research analysis using a randomly generated session identifier rather than your name or other direct identifiers.
           </p>
           <p className="mt-2 font-medium text-foreground">
             Avoid keeping too many results in one session, as browser memory usage will increase. Export important results as PDFs before refreshing the page.
           </p>
-        </div>
+        </aside>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-rows-[18rem_minmax(0,1fr)] gap-5 xl:grid-cols-[19rem_minmax(0,1fr)] xl:grid-rows-1">
@@ -59,7 +59,7 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect, on
                       key={result.inference_id}
                       type="button"
                       onClick={() => onSelect(result.inference_id)}
-                      className={`w-full rounded-md border px-3 py-3 text-left transition-colors ${
+                      className={`w-full cursor-pointer rounded-md border px-3 py-3 text-left transition-colors ${
                         isSelected
                           ? 'border-primary bg-primary text-primary-foreground'
                           : 'border-border bg-white text-foreground hover:bg-muted/50'
