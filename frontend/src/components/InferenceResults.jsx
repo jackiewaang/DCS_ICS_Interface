@@ -28,12 +28,12 @@ export default function InferenceResults({ data }) {
 
   if (!data) {
     return (
-      <section className="flex h-full min-h-96 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
+      <section className="flex h-full min-h-96 items-center justify-center rounded-lg border border-dashed border-border bg-card p-8 text-center shadow-sm">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
             Inference results
           </span>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-muted-foreground">
             Run inference to display model output here.
           </p>
         </div>
@@ -42,13 +42,13 @@ export default function InferenceResults({ data }) {
   }
 
   const shellClass = isFullscreen
-    ? 'fixed inset-4 z-50 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-2xl'
-    : 'flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm';
+    ? 'fixed inset-4 z-50 overflow-y-auto rounded-lg border border-border bg-card shadow-2xl'
+    : 'flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm';
 
   return (
     <section className={shellClass}>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4">
-        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted px-5 py-4">
+        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
           Inference results
         </span>
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">

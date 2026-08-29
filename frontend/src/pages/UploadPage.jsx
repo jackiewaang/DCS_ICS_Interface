@@ -176,11 +176,11 @@ export default function UploadPage({ activeConfigId }) {
 
   return (
     <div className="flex min-h-full w-full flex-col gap-6 p-6 md:p-8">
-      <header className="shrink-0 space-y-2 border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-[2rem]">
+      <header className="shrink-0 space-y-2 border-b border-border pb-5">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[2rem]">
           New Case Draft
         </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
+        <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
           Upload a PDF, edit the extracted REF sections, then run inference with the active model.
         </p>
       </header>

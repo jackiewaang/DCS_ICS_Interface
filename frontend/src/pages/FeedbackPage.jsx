@@ -40,19 +40,19 @@ export default function FeedbackPage() {
 
   return (
     <div className="flex min-h-full items-center justify-center p-6 md:p-8">
-      <section className="w-full max-w-xl rounded-xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-        <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100">
-          <MessageSquare className="h-5 w-5 text-slate-600" />
+      <section className="w-full max-w-xl rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm md:p-8">
+        <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-full bg-secondary">
+          <MessageSquare className="h-5 w-5 text-secondary-foreground" />
         </div>
 
-        <h1 className="text-2xl font-semibold text-slate-950">Share your feedback</h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+        <h1 className="text-2xl font-semibold text-foreground">Share your feedback</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           Tell us what works well or what would make the system more useful.
         </p>
 
         <form className="mt-7 space-y-6" onSubmit={handleSubmit}>
           <fieldset>
-            <legend className="text-sm font-medium text-slate-800">Overall experience</legend>
+            <legend className="text-sm font-medium text-foreground">Overall experience</legend>
             <div className="mt-3 flex gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
                 <button
@@ -65,10 +65,10 @@ export default function FeedbackPage() {
                     setError("");
                     setIsSubmitted(false);
                   }}
-                  className={`cursor-pointer rounded-md border p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${
+                  className={`cursor-pointer rounded-md border p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                     value <= rating
-                      ? "border-amber-300 bg-amber-50 text-amber-500"
-                      : "border-slate-200 text-slate-300 hover:border-slate-300 hover:text-slate-400"
+                      ? "border-warning bg-warning/10 text-warning"
+                      : "border-border text-muted-foreground/45 hover:border-ring hover:text-muted-foreground"
                   }`}
                 >
                   <Star className={`h-5 w-5 ${value <= rating ? "fill-current" : ""}`} />
@@ -78,7 +78,7 @@ export default function FeedbackPage() {
           </fieldset>
 
           <div>
-            <label htmlFor="feedback-message" className="text-sm font-medium text-slate-800">
+            <label htmlFor="feedback-message" className="text-sm font-medium text-foreground">
               Your feedback
             </label>
             <textarea
@@ -92,27 +92,27 @@ export default function FeedbackPage() {
                 setError("");
                 setIsSubmitted(false);
               }}
-              className="mt-3 w-full resize-y rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-xs outline-none placeholder:text-slate-400 focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+              className="mt-3 w-full resize-y rounded-md border border-input bg-background px-3 py-2.5 text-sm text-foreground shadow-xs outline-none placeholder:text-muted-foreground/70 focus:border-ring focus:ring-2 focus:ring-ring/20"
             />
-            <p className="mt-1.5 text-right text-xs text-slate-400">
+            <p className="mt-1.5 text-right text-xs text-muted-foreground">
               {message.length.toLocaleString()} / {MAX_MESSAGE_LENGTH.toLocaleString()}
             </p>
           </div>
 
           {error && (
-            <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
             </p>
           )}
 
           {isSubmitted && (
-            <p role="status" className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            <p role="status" className="flex items-center gap-2 rounded-md bg-success/10 px-3 py-2 text-sm text-success">
               <CheckCircle2 className="h-4 w-4" />
               Thank you. Your feedback has been submitted.
             </p>
           )}
 
-          <Button type="submit" disabled={isSubmitting} className="w-full bg-slate-700 hover:bg-slate-800">
+          <Button type="submit" disabled={isSubmitting} className="w-full">
             <Send className="h-4 w-4" />
             {isSubmitting ? "Submitting…" : "Submit feedback"}
           </Button>

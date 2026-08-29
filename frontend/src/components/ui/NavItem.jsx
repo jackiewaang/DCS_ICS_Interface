@@ -5,8 +5,8 @@ function NavItem({ icon, label, isActive, onClick, isCollapsed }) {
             isCollapsed ? "justify-center" : "gap-3"
         } ${
             isActive
-            ? "bg-slate-100 text-slate-900 shadow-sm"
-            : "hover:bg-slate-100 hover:text-slate-900"
+            ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         }`}
         >
             {icon}

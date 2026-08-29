@@ -43,19 +43,19 @@ export default function App() {
 
   return (
     <div className="flex bg-background overflow-hidden h-screen w-full text-foreground">
-      <aside className={`bg-slate-700 text-slate-100 flex flex-col border-r border-slate-600/50 shadow-sm z-10 shrink-0 transition-all duration-300 ease-in-out relative ${isCollapsed ? 'w-20' : 'w-68'}`}>
+      <aside className={`bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border shadow-sm z-10 shrink-0 transition-all duration-300 ease-in-out relative ${isCollapsed ? 'w-20' : 'w-68'}`}>
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
-          className="absolute -right-3 top-10 bg-slate-50 text-slate-700 rounded-full p-1 shadow-sm border border-slate-300 hover:bg-white transition-colors z-20 cursor-pointer">
+          className="absolute -right-3 top-10 bg-card text-primary rounded-full p-1 shadow-sm border border-border hover:bg-secondary transition-colors z-20 cursor-pointer">
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
 
         <div className={`p-5 overflow-hidden ${isCollapsed ? 'items-center' : ''}`}>
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2 whitespace-nowrap">
-            <LayoutDashboard className="h-4 w-4 text-slate-200 shrink-0" />
+          <h2 className="text-lg font-semibold text-sidebar-foreground flex items-center gap-2 whitespace-nowrap">
+            <LayoutDashboard className="h-4 w-4 text-sidebar-foreground/80 shrink-0" />
             {!isCollapsed && <span>REF Analysis</span>}
           </h2>
-          {!isCollapsed && <p className="text-[11px] text-slate-300 mt-1">Impact case evaluation</p>}
+          {!isCollapsed && <p className="text-[11px] text-sidebar-foreground/70 mt-1">Impact case evaluation</p>}
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-3">
@@ -89,16 +89,16 @@ export default function App() {
           />
         </nav>
 
-        <div className={`mt-auto border-t border-slate-600/50 p-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0 overflow-hidden' : 'opacity-100'}`}>
+        <div className={`mt-auto border-t border-sidebar-border p-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0 overflow-hidden' : 'opacity-100'}`}>
           <button
             type="button"
             onClick={() => setIsSettingsExpanded((current) => !current)}
             aria-expanded={isSettingsExpanded}
-            className="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-slate-300"
+            className="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-sidebar-foreground/75"
           >
             <span className="flex items-center gap-2">
               <Settings2 size={16} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+              <span className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/75">
                 Inference Settings
               </span>
             </span>
@@ -109,14 +109,14 @@ export default function App() {
             <div className="min-h-0 overflow-hidden">
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-[10px] text-slate-300 uppercase tracking-wider">Active engine</Label>
+                  <Label className="text-[10px] text-sidebar-foreground/75 uppercase tracking-wider">Active engine</Label>
                   <Select value={activeConfigId} onValueChange={setActiveConfigId}>
-                    <SelectTrigger className="w-full bg-slate-800 border-slate-600 text-slate-100 h-9 text-xs focus:ring-slate-400">
+                    <SelectTrigger className="w-full bg-sidebar-accent border-sidebar-border text-sidebar-accent-foreground h-9 text-xs focus:ring-sidebar-ring">
                       <SelectValue placeholder="Select Model" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800 border-slate-600 text-slate-100 shadow-lg">
+                    <SelectContent className="bg-sidebar border-sidebar-border text-sidebar-foreground shadow-lg">
                       {models.map((model) => (
-                        <SelectItem key={model.config_id} value={model.config_id.toString()} className="text-xs focus:bg-slate-700">
+                        <SelectItem key={model.config_id} value={model.config_id.toString()} className="text-xs focus:bg-sidebar-accent focus:text-sidebar-accent-foreground">
                           {model.name}
                         </SelectItem>
                       ))}

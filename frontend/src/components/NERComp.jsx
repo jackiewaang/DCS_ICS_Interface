@@ -14,9 +14,9 @@ const NERComp = ({ data }) => {
     <div className="space-y-6">
       
       {/* EXPLANATION SECTION */}
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.18em] mb-1.5">Evidence Index</h3>
-        <p className="text-xs text-slate-600 leading-relaxed">
+      <div className="bg-muted border border-border rounded-lg p-4">
+        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.18em] mb-1.5">Evidence Index</h3>
+        <p className="text-xs text-muted-foreground leading-relaxed">
           Key entities extracted from the narrative that may influence impact assessment: organizations, financial impact, and stakeholder involvement.
         </p>
       </div>
@@ -33,12 +33,12 @@ const NERComp = ({ data }) => {
           ).filter(Boolean);
 
           return (
-            <div key={cat.id} className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div key={cat.id} className="bg-card border border-border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
               
               {/* HEADER */}
               <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-bold text-slate-900">{cat.label}</h4>
-                <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-1 rounded-full">
+                <h4 className="text-sm font-bold text-foreground">{cat.label}</h4>
+                <span className="text-xs font-semibold bg-secondary text-secondary-foreground px-2 py-1 rounded-full">
                   {items.length}
                 </span>
               </div>
@@ -47,20 +47,20 @@ const NERComp = ({ data }) => {
               {items.length > 0 ? (
                 <ul className="space-y-2">
                   {items.slice(0, 12).map((item, idx) => (
-                    <li key={idx} className="text-xs text-slate-700 flex items-start gap-2">
-                      <span className="text-slate-400 select-none shrink-0 mt-1">•</span>
+                    <li key={idx} className="text-xs text-secondary-foreground flex items-start gap-2">
+                      <span className="text-muted-foreground select-none shrink-0 mt-1">•</span>
                       <span className="leading-relaxed">{item}</span>
                     </li>
                   ))}
                   
                   {items.length > 12 && (
-                    <li className="text-[10px] text-slate-500 pt-2 mt-2 border-t border-slate-200 italic">
+                    <li className="text-[10px] text-muted-foreground pt-2 mt-2 border-t border-border italic">
                       +{items.length - 12} more detected
                     </li>
                   )}
                 </ul>
               ) : (
-                <p className="text-xs text-slate-500 italic">No evidence detected</p>
+                <p className="text-xs text-muted-foreground italic">No evidence detected</p>
               )}
             </div>
           );

@@ -43,16 +43,16 @@ export default function SearchHeader({ onCaseSelect }) {
     }, [query]);
 
     return (
-        <div className="relative z-50 w-full border-b border-slate-200/80 bg-slate-100/75 backdrop-blur-sm" ref={wrapperRef}>
+        <div className="relative z-50 w-full border-b border-border/80 bg-secondary/75 backdrop-blur-sm" ref={wrapperRef}>
             <div className="mx-auto max-w-7xl px-6 py-2.5">
                 <div className="relative z-50 group max-w-2xl">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                        {isLoading ? <Loader2 className="w-4 h-4 text-slate-500 animate-spin" /> : <Search className="w-4 h-4 text-slate-400" />}
+                        {isLoading ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" /> : <Search className="w-4 h-4 text-muted-foreground/70" />}
                     </div>
                     
                     <input
                         type="text"
-                        className="w-full bg-white border border-slate-200 py-2.5 pl-11 pr-4 rounded-md text-sm transition-all focus:bg-white focus:ring-1 focus:ring-slate-300 focus:border-slate-300 outline-none"
+                        className="w-full bg-card border border-input py-2.5 pl-11 pr-4 rounded-md text-sm transition-all focus:bg-card focus:ring-1 focus:ring-ring focus:border-ring outline-none"
                         placeholder="Search by Title, Model, or Institution..."
                         value={query}
                         onFocus={() => query.length > 0 && setIsOpen(true)}
@@ -60,7 +60,7 @@ export default function SearchHeader({ onCaseSelect }) {
                     />
 
                     {isOpen && (
-                        <div className="absolute left-0 right-0 top-full z-999 mt-1 max-h-80 overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg" style={{ zIndex: 999 }}>
+                        <div className="absolute left-0 right-0 top-full z-999 mt-1 max-h-80 overflow-y-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg" style={{ zIndex: 999 }}>
                             {results.length > 0 ? (
                                 results.map((item) => (
                                     <button
@@ -70,24 +70,24 @@ export default function SearchHeader({ onCaseSelect }) {
                                             setIsOpen(false);
                                             setQuery("");
                                         }}
-                                        className="cursor-pointer w-full text-left px-4 py-3 hover:bg-slate-50 flex flex-col border-b border-slate-50 last:border-0"
+                                        className="group/item cursor-pointer w-full text-left px-4 py-3 hover:bg-accent hover:text-accent-foreground flex flex-col border-b border-border/40 last:border-0"
                                     >
                                         <div className="flex justify-between items-start gap-4">
-                                            <span className="text-sm font-semibold text-slate-900">{item.title}</span>
+                                            <span className="text-sm font-semibold">{item.title}</span>
                                             {/* Model Badge */}
-                                            <span className="text-[9px] font-bold text-slate-700 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase shrink-0">
+                                            <span className="text-[9px] font-bold text-secondary-foreground bg-secondary border border-border px-1.5 py-0.5 rounded uppercase shrink-0">
                                                 {item.model_name}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-[10px] text-slate-500 uppercase tracking-wider">
+                                            <span className="text-[10px] text-muted-foreground group-hover/item:text-accent-foreground uppercase tracking-wider">
                                                 DOC: {item.document_id} • {item.uoa} • {item.institution}
                                             </span>
                                         </div>
                                     </button>
                                 ))
                             ) : (
-                                <div className="px-4 py-6 text-center text-xs text-slate-400 italic">
+                                <div className="px-4 py-6 text-center text-xs text-muted-foreground italic">
                                     No matching analysis results found.
                                 </div>
                             )}

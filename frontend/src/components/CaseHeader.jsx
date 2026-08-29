@@ -22,28 +22,28 @@ export default function CaseHeader({ data }) {
   const inferenceTime = formatInferenceTime();
 
   return (
-    <header className="border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
+    <header className="border-b border-border/80 bg-card/90 backdrop-blur-sm">
       <div className="px-6 py-6 max-w-7xl mx-auto">
-        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.18em]">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.18em]">
           {getSourceLabel()} • Doc #{data.document_id}
         </span>
-        <h1 className="text-2xl md:text-[2rem] font-semibold text-slate-900 mt-2 leading-tight">
+        <h1 className="text-2xl md:text-[2rem] font-semibold text-foreground mt-2 leading-tight">
           {data.title || "Untitled Analysis"}
         </h1>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-3">
-          <span className="text-sm text-slate-600">{data.institution}</span>
-          <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-          <span className="text-sm font-medium text-slate-700">{data.uoa}</span>
+          <span className="text-sm text-muted-foreground">{data.institution}</span>
+          <span className="inline-block h-1 w-1 rounded-full bg-border" />
+          <span className="text-sm font-medium text-secondary-foreground">{data.uoa}</span>
           {data.model_name && (
             <>
-              <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-              <span className="text-sm font-medium text-slate-700">Model: {data.model_name}</span>
+              <span className="inline-block h-1 w-1 rounded-full bg-border" />
+              <span className="text-sm font-medium text-secondary-foreground">Model: {data.model_name}</span>
             </>
           )}
           {inferenceTime && (
             <>
-              <span className="inline-block h-1 w-1 rounded-full bg-slate-300" />
-              <span className="text-sm font-medium text-slate-700">Inference time: {inferenceTime}</span>
+              <span className="inline-block h-1 w-1 rounded-full bg-border" />
+              <span className="text-sm font-medium text-secondary-foreground">Inference time: {inferenceTime}</span>
             </>
           )}
         </div>
