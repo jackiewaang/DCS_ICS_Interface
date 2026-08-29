@@ -121,6 +121,7 @@ export default function UploadPage({ activeConfigId }) {
 
     setIsRunningInference(true);
     setInferenceError(null);
+    setInferenceResult(null);
 
     try {
       const startedAt = performance.now();

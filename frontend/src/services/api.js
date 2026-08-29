@@ -59,6 +59,7 @@ function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
     feature_gates: featureGates,
     feature_attributions: output.feature_attributions || featureAttributions,
     global_importance: output.global_importance || {},
+    llm_input: output.llm_input || null,
   };
 }
 
@@ -127,15 +128,16 @@ export const api = {
     return handleResponse(response);
   },
 
-  async getLLMInference(inferenceId) {
-    const response = await fetch(`${API_BASE}/analysis/llm-inference/${inferenceId}`);
-    if (response.status === 404) {
-      return {
-        inference_id: inferenceId,
-        status: "not_found",
-      };
-    }
-
+  async getLLMFeedback(llmInput, signal) {
+    const response = await fetch(`${API_BASE}/analysis/llm-feedback`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-ID": USER_ID,
+      },
+      body: JSON.stringify(llmInput),
+      signal,
+    });
     return handleResponse(response);
   },
 

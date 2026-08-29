@@ -7,10 +7,6 @@ from app.api.endpoints.cases import router as cases_router
 from app.api.endpoints.feedback import router as feedback_router
 from app.database import init_db
 from app.logging_config import configure_logging
-from app.retention import (
-    start_cleanup_task,
-    stop_cleanup_task,
-)
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -19,12 +15,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting backend and checking database tables")
     init_db()
-    cleanup_task = start_cleanup_task()
-    try:
-        yield
-    finally:
-        await stop_cleanup_task(cleanup_task)
-        logger.info("Backend shutdown complete")
+    yield
+    logger.info("Backend shutdown complete")
 
 app = FastAPI(
     title="The Language of REF API",

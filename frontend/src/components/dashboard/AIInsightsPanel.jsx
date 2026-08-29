@@ -1,6 +1,5 @@
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
-import useLLMInference from '@/hooks/useLLMInference';
 
 const INSIGHT_CATEGORIES = [
   {
@@ -51,7 +50,7 @@ function StatusBanner({ status, errorMessage }) {
           {isError && 'AI insight generation failed'}
         </p>
         <p className="leading-relaxed">
-          {isRunning && 'The panel is polling the LLM inference endpoint for the generated review responses.'}
+          {isRunning && 'The LLM is reviewing the current inference results.'}
           {isNotFound && 'This inference does not have an associated LLM insight result.'}
           {isError && (errorMessage || 'The LLM service returned an error while generating the review.')}
         </p>
@@ -88,10 +87,7 @@ function InsightCard({ title, description, items }) {
   );
 }
 
-export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
-  const inferenceId = data?.inference_id;
-  const internalLlmState = useLLMInference(providedLlmState ? null : inferenceId);
-  const llmState = providedLlmState || internalLlmState;
+export default function AIInsightsPanel({ data, llmState }) {
 
   if (!data) {
     return (
@@ -115,11 +111,9 @@ export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
     </a>
   );
 
-  const llmResult = llmState.inferenceId === inferenceId ? llmState.result : null;
-  const status = inferenceId
-    ? llmState.inferenceId === inferenceId ? llmState.status : 'loading'
-    : 'idle';
-  const errorMessage = llmState.inferenceId === inferenceId ? llmState.errorMessage : '';
+  const llmResult = llmState?.result;
+  const status = llmState?.status || 'not_found';
+  const errorMessage = llmState?.errorMessage || '';
   const isCompleted = status === 'completed';
   const panelContent = (
     <div className="space-y-8">

@@ -9,7 +9,7 @@ import PromptLab from "./pages/PromptLab";
 import NavItem from "./components/ui/NavItem";
 
 export default function App() {
-  const [currentView, setCurrentView] = useState("browse");
+  const [currentView, setCurrentView] = useState("upload");
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [models, setModels] = useState([]);
@@ -137,7 +137,7 @@ export default function App() {
             </div>
           </div>
           <p className="mt-4 border-t border-sidebar-border pt-4 text-xs leading-relaxed text-sidebar-foreground/65">
-            Documents, model outputs, and usage activity are logged for research analysis using a randomly generated session identifier rather than your name or other direct identifiers. Inference results are retained in the application database for approximately two minutes before automatic deletion. Refreshing the page clears the results shown in your browser, but does not immediately remove research logs already recorded on the server.
+            Analysis results are not stored as database cases and are cleared from the browser when the page is refreshed. Submitted text, model outputs, and usage activity are logged for research analysis using a randomly generated session identifier rather than your name or other direct identifiers.
           </p>
         </div>
       </aside>

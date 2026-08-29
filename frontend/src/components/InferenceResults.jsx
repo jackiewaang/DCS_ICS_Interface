@@ -7,7 +7,7 @@ import HeatmapPanel from '@/components/dashboard/HeatmapPanel';
 import FeaturesPanel from '@/components/dashboard/FeaturesPanel';
 import EntitiesPanel from '@/components/dashboard/EntitiesPanel';
 import { Button } from '@/components/ui/button';
-import useLLMInference from '@/hooks/useLLMInference';
+import useLLMFeedback from '@/hooks/useLLMFeedback';
 import { exportAnalysisPdf } from '@/services/exportAnalysisPdf';
 
 const TABS = [
@@ -20,10 +20,7 @@ const TABS = [
 
 export default function InferenceResults({ data }) {
   const [activeTab, setActiveTab] = useState('main');
-  const llmState = useLLMInference(data?.inference_id);
-  const currentLlmState = llmState.inferenceId === data?.inference_id
-    ? llmState
-    : { inferenceId: data?.inference_id, result: null, status: 'loading', errorMessage: '' };
+  const llmState = useLLMFeedback(data?.llm_input);
 
   if (!data) {
     return (
@@ -50,7 +47,7 @@ export default function InferenceResults({ data }) {
           <Button
             type="button"
             variant="outline"
-            onClick={() => exportAnalysisPdf(data, currentLlmState)}
+            onClick={() => exportAnalysisPdf(data, llmState)}
             className="h-9 gap-2"
           >
             <Download className="h-4 w-4" />
@@ -82,7 +79,7 @@ export default function InferenceResults({ data }) {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         {activeTab === 'main' && <MainOverviewPanel data={data} />}
-        {activeTab === 'ai' && <AIInsightsPanel data={data} llmState={currentLlmState} />}
+        {activeTab === 'ai' && <AIInsightsPanel data={data} llmState={llmState} />}
         {activeTab === 'heatmap' && <HeatmapPanel data={data} />}
         {activeTab === 'features' && <FeaturesPanel data={data} />}
         {activeTab === 'entities' && <EntitiesPanel data={data} />}

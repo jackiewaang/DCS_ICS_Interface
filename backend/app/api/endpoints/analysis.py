@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -9,17 +8,15 @@ from uuid import UUID
 import requests
 from dotenv import dotenv_values
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.llm.service import generate_review
+from app.llm.service import generate_feedback
 from app.models.document import DocumentFeatures, DocumentMetadata
 from app.models.inference import (
     Attention,
     Inference,
-    LLMInference,
-    LLMInferenceStatus,
     ModelConfig,
 )
 from app.pipeline.manager import PipelineManager
@@ -49,6 +46,15 @@ class InferenceSections(BaseModel):
     summary: str = ""
     research: str = ""
     impact: str = ""
+
+
+class LLMInput(BaseModel):
+    prediction_label: str | None = None
+    score: float | None = None
+    top_sentences: list[dict] = Field(default_factory=list)
+    top_features: list[dict] = Field(default_factory=list)
+    summary: str = ""
+    details: str = ""
 
 
 @router.get("/runtime-models")
@@ -146,15 +152,27 @@ async def run_inference(
         feature_names=output.get("feature_names", []),
     )
     _log_inference(user_id, config_id, sections, output["score"])
-    output.update(_save_inference_output(
-        config_id=config_id,
-        sections=sections,
-        output=output,
-    ))
-    _create_llm_inference(output["inference_id"])
-    asyncio.create_task(_run_llm_review(output["inference_id"]))
+    output["llm_input"] = _build_llm_input(sections, output)
 
     return output
+
+
+@router.post("/llm-feedback")
+async def run_llm_feedback(
+    llm_input: LLMInput,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    if not (LOGS_DIR / str(user_id)).is_dir():
+        raise HTTPException(
+            status_code=403,
+            detail="Run MIL inference before requesting LLM feedback.",
+        )
+
+    try:
+        return await generate_feedback(llm_input.model_dump())
+    except Exception as exc:
+        logger.exception("LLM feedback generation failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 def _log_inference(
@@ -179,50 +197,45 @@ def _log_inference(
         log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-@router.get("/llm-inference/{inference_id}")
-def get_llm_inference(inference_id: int):
-    with SessionLocal() as db:
-        llm_inference = db.scalar(
-            select(LLMInference).where(LLMInference.inference_id == inference_id)
-        )
+def _build_llm_input(sections: InferenceSections, output: dict) -> dict:
+    top_sentences = sorted(
+        (
+            {"sentence_text": sentence, "weight": weight}
+            for sentence, weight in zip(
+                output.get("sentences") or [],
+                output.get("attention") or [],
+            )
+        ),
+        key=lambda item: item["weight"],
+        reverse=True,
+    )[:10]
 
-        if llm_inference is None:
-            raise HTTPException(status_code=404, detail="LLM inference result not found")
-
-        status = _status_value(llm_inference.status)
-        if status == LLMInferenceStatus.ERROR.value:
-            return {
-                "inference_id": inference_id,
-                "status": status,
-                "error_message": llm_inference.error_message,
+    features = output.get("features") or {}
+    top_features = sorted(
+        (
+            {
+                "feature_name": name,
+                "local_weight": weight,
+                "value": features[name],
             }
+            for name, weight in zip(
+                output.get("feature_names") or [],
+                output.get("feature_gates") or [],
+            )
+            if name in features
+        ),
+        key=lambda item: item["local_weight"],
+        reverse=True,
+    )[:10]
 
-        if status == LLMInferenceStatus.COMPLETED.value:
-            return {
-                "inference_id": inference_id,
-                "status": status,
-                "significance_limitations": _json_loads(
-                    llm_inference.significance_limitations,
-                    default=[],
-                ),
-                "significance_improvements": _json_loads(
-                    llm_inference.significance_improvements,
-                    default=[],
-                ),
-                "outreach_limitations": _json_loads(
-                    llm_inference.outreach_limitations,
-                    default=[],
-                ),
-                "outreach_improvements": _json_loads(
-                    llm_inference.outreach_improvements,
-                    default=[],
-                ),
-            }
-
-        return {
-            "inference_id": inference_id,
-            "status": status,
-        }
+    return {
+        "prediction_label": output.get("label"),
+        "score": output.get("score"),
+        "top_sentences": top_sentences,
+        "top_features": top_features,
+        "summary": sections.summary,
+        "details": sections.impact,
+    }
 
 
 def _save_inference_output(
@@ -297,37 +310,6 @@ def _save_inference_output(
         }
 
 
-def _create_llm_inference(inference_id: int) -> None:
-    with SessionLocal() as db:
-        db.add(
-            LLMInference(
-                inference_id=inference_id,
-                status=LLMInferenceStatus.RUNNING,
-            )
-        )
-        db.commit()
-
-
-async def _run_llm_review(inference_id: int) -> None:
-    try:
-        await generate_review(inference_id)
-    except Exception:
-        logger.exception("LLM review failed: inference_id=%s", inference_id)
-
-
 def _normalise_title(value: str | None) -> str:
     title = (value or "").strip()
     return title or "Untitled inference"
-
-
-def _status_value(status: LLMInferenceStatus | str) -> str:
-    return status.value if isinstance(status, LLMInferenceStatus) else status
-
-
-def _json_loads(value: str | None, default):
-    if not value:
-        return default
-    try:
-        return json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        return default
