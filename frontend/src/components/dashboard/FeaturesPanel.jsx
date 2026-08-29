@@ -232,7 +232,6 @@ export default function FeaturesPanel({ data }) {
     <DashboardPanelFrame
       title="Features"
       helpText="Features extracted from the document and their importance weights for the model's classification decision. "
-      expandedChildren={panelContent}
     >
       {panelContent}
     </DashboardPanelFrame>

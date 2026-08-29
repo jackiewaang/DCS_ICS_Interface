@@ -145,7 +145,6 @@ export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
       title="Limitations and Improvements"
       helpText="AI-generated limitation and improvement feedbacks based on REF guidance."
       headerActions={headerActions}
-      expandedChildren={panelContent}
     >
       {panelContent}
     </DashboardPanelFrame>

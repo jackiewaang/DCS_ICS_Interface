@@ -156,7 +156,6 @@ export default function HeatmapPanel({ data }) {
     <DashboardPanelFrame
       title="Attention Heatmap"
       helpText="Sentence-level attention summary and hoverable highlights for the selected case."
-      expandedChildren={panelContent}
     >
       {panelContent}
     </DashboardPanelFrame>

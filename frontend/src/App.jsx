@@ -71,13 +71,15 @@ export default function App() {
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-3">
-          <NavItem
-            icon={<Search className="h-4 w-4 shrink-0" />}
-            label="Browse Past Cases"
-            isActive={currentView === "browse"}
-            onClick={() => setCurrentView("browse")}
-            isCollapsed={isCollapsed}
-          />
+          <div className="hidden">
+            <NavItem
+              icon={<Search className="h-4 w-4 shrink-0" />}
+              label="Browse Past Cases"
+              isActive={currentView === "browse"}
+              onClick={() => setCurrentView("browse")}
+              isCollapsed={isCollapsed}
+            />
+          </div>
           <NavItem
             icon={<Upload className="h-4 w-4 shrink-0" />}
             label="Upload New Case"
@@ -92,13 +94,15 @@ export default function App() {
             onClick={() => setCurrentView("models")}
             isCollapsed={isCollapsed}
           />
-          <NavItem
-            icon={<Terminal className="h-4 w-4 shrink-0" />}
-            label="Prompt Lab"
-            isActive={currentView === "prompts"}
-            onClick={() => setCurrentView("prompts")}
-            isCollapsed={isCollapsed}
-          />
+          <div className="hidden">
+            <NavItem
+              icon={<Terminal className="h-4 w-4 shrink-0" />}
+              label="Prompt Lab"
+              isActive={currentView === "prompts"}
+              onClick={() => setCurrentView("prompts")}
+              isCollapsed={isCollapsed}
+            />
+          </div>
           <NavItem
             icon={<MessageSquare className="h-4 w-4 shrink-0" />}
             label="Feedback"
@@ -132,6 +136,9 @@ export default function App() {
               </p>
             </div>
           </div>
+          <p className="mt-4 border-t border-sidebar-border pt-4 text-xs leading-relaxed text-sidebar-foreground/65">
+            Documents, model outputs, and usage activity are logged for research analysis using a randomly generated session identifier rather than your name or other direct identifiers. Inference results are retained in the application database for approximately two minutes before automatic deletion. Refreshing the page clears the results shown in your browser, but does not immediately remove research logs already recorded on the server.
+          </p>
         </div>
       </aside>
 

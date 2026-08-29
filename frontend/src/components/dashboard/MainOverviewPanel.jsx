@@ -216,7 +216,7 @@ export default function MainOverviewPanel({ data }) {
   );
 
   return (
-    <DashboardPanelFrame title="Overview" helpText="Prediction summary with attention, feature, and entity highlights across the other tabs." expandedChildren={panelContent}>
+    <DashboardPanelFrame title="Overview" helpText="Prediction summary with attention, feature, and entity highlights across the other tabs.">
       {panelContent}
     </DashboardPanelFrame>
   );

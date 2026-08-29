@@ -183,7 +183,6 @@ export default function EntitiesPanel({ data }) {
     <DashboardPanelFrame
       title="Entities"
       helpText="Entities extracted from the document using Named Entity Recognition grouped into relevant categories with unique counts and expandable lists."
-      expandedChildren={<EntitiesContent data={data} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />}
     >
       <EntitiesContent data={data} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
     </DashboardPanelFrame>

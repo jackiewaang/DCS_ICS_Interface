@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Maximize2, Minimize2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import CaseHeader from '@/components/CaseHeader';
 import MainOverviewPanel from '@/components/dashboard/MainOverviewPanel';
 import AIInsightsPanel from '@/components/dashboard/AIInsightsPanel';
@@ -20,7 +20,6 @@ const TABS = [
 
 export default function InferenceResults({ data }) {
   const [activeTab, setActiveTab] = useState('main');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const llmState = useLLMInference(data?.inference_id);
   const currentLlmState = llmState.inferenceId === data?.inference_id
     ? llmState
@@ -41,12 +40,8 @@ export default function InferenceResults({ data }) {
     );
   }
 
-  const shellClass = isFullscreen
-    ? 'fixed inset-4 z-50 overflow-y-auto rounded-lg border border-border bg-card shadow-2xl'
-    : 'flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm';
-
   return (
-    <section className={shellClass}>
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-muted px-5 py-4">
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
           Inference results
@@ -60,15 +55,6 @@ export default function InferenceResults({ data }) {
           >
             <Download className="h-4 w-4" />
             Export PDF
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsFullscreen((current) => !current)}
-            className="h-9 gap-2"
-          >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            {isFullscreen ? 'Exit full screen' : 'Full screen'}
           </Button>
         </div>
       </div>
