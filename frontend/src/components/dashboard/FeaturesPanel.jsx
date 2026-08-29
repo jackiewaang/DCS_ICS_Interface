@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ArrowDownAZ, ArrowDownWideNarrow, ChevronDown, ChevronUp } from 'lucide-react';
+import { getObservedRange } from '@/helper/analysis_display';
 import { ENTITY_METRIC_KEYS, METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_definitions';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
 
@@ -46,23 +47,6 @@ function getValueLabel(value, format) {
   }
 
   return format(numericValue);
-}
-
-function getObservedRange(rows, key) {
-  if (!rows.length) {
-    return 'N/A';
-  }
-
-  const values = rows.map((row) => Number(row[key])).filter((value) => Number.isFinite(value));
-
-  if (!values.length) {
-    return 'N/A';
-  }
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  return `${min.toFixed(4)} - ${max.toFixed(4)}`;
 }
 
 function getFeatureRows(data, sortMode) {

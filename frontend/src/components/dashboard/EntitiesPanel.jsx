@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { getObservedRange } from '@/helper/analysis_display';
 import { decodeHTML } from '@/helper/utils';
 import { METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_definitions';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
@@ -20,23 +21,6 @@ function getCategoryItems(entities, category) {
   const rawItems = category.aliases.flatMap((alias) => entities?.[alias] || []);
 
   return Array.from(new Set(rawItems.map((item) => decodeHTML(String(item)).trim()))).filter(Boolean);
-}
-
-function getObservedRange(rows, key) {
-  if (!rows.length) {
-    return 'N/A';
-  }
-
-  const values = rows.map((row) => Number(row[key])).filter((value) => Number.isFinite(value));
-
-  if (!values.length) {
-    return 'N/A';
-  }
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  return `${min.toFixed(4)} - ${max.toFixed(4)}`;
 }
 
 function EntitiesContent({ data, activeCategory, setActiveCategory }) {

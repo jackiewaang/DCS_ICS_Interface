@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
 import SectionEditor from '@/components/SectionEditor';
@@ -49,7 +49,7 @@ function hasSectionText(sections) {
   return Boolean(sections.summary || sections.research || sections.impact);
 }
 
-export default function UploadPage({ activeConfigId }) {
+export default function UploadPage({ activeConfigId, onAnalysisComplete }) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
@@ -60,6 +60,11 @@ export default function UploadPage({ activeConfigId }) {
   const [collapsedSections, setCollapsedSections] = useState(EXPANDED_SECTIONS);
   const [inferenceResult, setInferenceResult] = useState(null);
   const fileInputRef = useRef(null);
+
+  const handleResultUpdate = useCallback((result) => {
+    setInferenceResult(result);
+    onAnalysisComplete?.(result);
+  }, [onAnalysisComplete]);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files?.[0];
@@ -130,7 +135,7 @@ export default function UploadPage({ activeConfigId }) {
         sections: draft.sections,
       });
       const inferenceTimeMs = Math.round(performance.now() - startedAt);
-      setInferenceResult({
+      handleResultUpdate({
         ...result,
         inference_time_ms: result.inference_time_ms ?? inferenceTimeMs, // TODO: Check if backend is returning inference_time_ms, if not, use the calculated time
       });
@@ -211,7 +216,7 @@ export default function UploadPage({ activeConfigId }) {
           hasDraft={hasDraft}
         />
 
-        <InferenceResults data={inferenceResult} />
+        <InferenceResults data={inferenceResult} onResultUpdate={handleResultUpdate} />
       </div>
     </div>
   );

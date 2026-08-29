@@ -75,18 +75,6 @@ export const api = {
     return handleResponse(response);
   },
 
-  // --- ANALYSIS ENGINE ---
-  async runAnalysis(file, configId) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const response = await fetch(`${API_BASE}/analysis/run?config_id=${configId}`, {
-      method: "POST",
-      body: formData,
-    });
-    return handleResponse(response);
-  },
-
   async uploadCase(file) {
     const formData = new FormData();
     formData.append("file", file);
@@ -118,16 +106,6 @@ export const api = {
     return normalizeInferenceOutput(output, { ...draft, sections }, configId);
   },
 
-  async getInferenceById(inferenceId) {
-    const response = await fetch(`${API_BASE}/cases/inference/${inferenceId}`);
-    return handleResponse(response);
-  },
-
-  async getLatestInference() {
-    const response = await fetch(`${API_BASE}/cases/latest`);
-    return handleResponse(response);
-  },
-
   async getLLMFeedback(llmInput, signal) {
     const response = await fetch(`${API_BASE}/analysis/llm-feedback`, {
       method: "POST",
@@ -150,21 +128,6 @@ export const api = {
       },
       body: JSON.stringify(feedback),
     });
-    return handleResponse(response);
-  },
-
-  // --- CASE MANAGEMENT ---
-  async getCases(query = "", uoa = "") {
-    const params = new URLSearchParams();
-    if (query) params.append("q", query);
-    if (uoa) params.append("uoa", uoa);
-
-    const response = await fetch(`${API_BASE}/cases/?${params.toString()}`);
-    return handleResponse(response);
-  },
-
-  async getCaseById(documentId) {
-    const response = await fetch(`${API_BASE}/cases/${documentId}`);
     return handleResponse(response);
   }
 };

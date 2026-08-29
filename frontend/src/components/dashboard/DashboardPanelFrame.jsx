@@ -19,7 +19,7 @@ export function DashboardHelp({ text }) {
 
 export function DashboardPanelFrame({ title, helpText, children, headerActions = null, className = '' }) {
   return (
-    <section className={`rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm ${className}`.trim()}>
+    <section className={`rounded-xl border border-border bg-white p-6 text-card-foreground shadow-sm ${className}`.trim()}>
       <div className="mb-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <h2 className="text-2xl font-semibold text-foreground">{title}</h2>

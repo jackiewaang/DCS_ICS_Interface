@@ -1,32 +1,6 @@
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
-
-const INSIGHT_CATEGORIES = [
-  {
-    key: 'significance_limitations',
-    title: 'Significance Limitations',
-    description: 'Risks that could weaken the interpretation or defensibility of the claimed impact.',
-  },
-  {
-    key: 'significance_improvements',
-    title: 'Significance Improvements',
-    description: 'Changes that would make the impact claim more compelling and decision-ready.',
-  },
-  {
-    key: 'outreach_limitations',
-    title: 'Outreach Limitations',
-    description: 'Gaps that make the breadth, uptake, or beneficiary coverage harder to assess.',
-  },
-  {
-    key: 'outreach_improvements',
-    title: 'Outreach Improvements',
-    description: 'Changes that would make reach and audience adoption easier to evaluate.',
-  },
-];
-
-function SectionTooltip({ text }) {
-  return <DashboardHelp text={text} />;
-}
+import { DashboardPanelFrame } from '@/components/dashboard/DashboardPanelFrame';
+import { INSIGHT_CATEGORIES } from '@/helper/analysis_display';
 
 function StatusBanner({ status, errorMessage }) {
   const isRunning = status === 'loading' || status === 'running';

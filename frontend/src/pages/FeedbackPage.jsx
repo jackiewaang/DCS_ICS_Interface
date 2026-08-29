@@ -93,7 +93,7 @@ export default function FeedbackPage() {
         <header className="border-b border-border pb-6">
           <div className="flex items-start gap-4">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-secondary">
-              <MessageSquareText className="h-5 w-5 text-secondary-foreground" />
+              <MessageSquareText className="h-5 w-5" />
             </div>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[2rem]">
