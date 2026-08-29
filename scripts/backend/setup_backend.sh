@@ -5,7 +5,7 @@ REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 APP_DIR="$REPO_ROOT/backend"
 VENV="$APP_DIR/venv-backend"
 
-#module load Python/3.11.5-GCCcore-13.2.0
+#module load Python/3.11.5-GCCcore-13.2.0 - uncomment to load Python module if not loaded
 
 if [[ ! -d "$VENV" ]]; then
     python3.11 -m venv "$VENV"
