@@ -1,27 +1,25 @@
 import { useState, useEffect } from "react";
 import { api } from "./services/api";
-import { Search, Upload, Terminal, LayoutDashboard, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MessageSquare, Settings2 } from "lucide-react";
+import { Bot, Cpu, Database, Search, Upload, Terminal, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import FeedbackPage from "./pages/FeedbackPage";
+import ModelConfigsPage from "./pages/ModelConfigsPage";
 import UploadPage from "./pages/UploadPage";
 import PromptLab from "./pages/PromptLab";
 import NavItem from "./components/ui/NavItem";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 
 export default function App() {
   const [currentView, setCurrentView] = useState("browse");
   const [selectedCaseId, setSelectedCaseId] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isSettingsExpanded, setIsSettingsExpanded] = useState(true);
   const [models, setModels] = useState([]);
+  const [isModelsLoading, setIsModelsLoading] = useState(true);
+  const [modelsError, setModelsError] = useState("");
   const [activeConfigId, setActiveConfigId] = useState("");
+  const [runtimeModels, setRuntimeModels] = useState({
+    embedding_model: null,
+    llm_model: null,
+  });
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -30,10 +28,24 @@ export default function App() {
         setModels(data);
         if (data.length > 0) setActiveConfigId(data[0].config_id.toString());
       } catch (err) {
+        setModelsError(err.message || "Model configurations could not be loaded.");
         console.error("Failed to load models:", err.message);
+      } finally {
+        setIsModelsLoading(false);
       }
     };
     fetchModels();
+  }, []);
+
+  useEffect(() => {
+    const fetchRuntimeModels = async () => {
+      try {
+        setRuntimeModels(await api.getRuntimeModels());
+      } catch (err) {
+        console.error("Failed to load runtime model information:", err.message);
+      }
+    };
+    fetchRuntimeModels();
   }, []);
 
   const handleNewAnalysis = (newInferenceId) => {
@@ -74,6 +86,13 @@ export default function App() {
             isCollapsed={isCollapsed}
           />
           <NavItem
+            icon={<Database className="h-4 w-4 shrink-0" />}
+            label="Model Configs"
+            isActive={currentView === "models"}
+            onClick={() => setCurrentView("models")}
+            isCollapsed={isCollapsed}
+          />
+          <NavItem
             icon={<Terminal className="h-4 w-4 shrink-0" />}
             label="Prompt Lab"
             isActive={currentView === "prompts"}
@@ -89,41 +108,28 @@ export default function App() {
           />
         </nav>
 
-        <div className={`mt-auto border-t border-sidebar-border p-5 transition-all duration-300 ${isCollapsed ? 'opacity-0 invisible h-0 overflow-hidden' : 'opacity-100'}`}>
-          <button
-            type="button"
-            onClick={() => setIsSettingsExpanded((current) => !current)}
-            aria-expanded={isSettingsExpanded}
-            className="flex w-full cursor-pointer items-center justify-between gap-3 text-left text-sidebar-foreground/75"
-          >
-            <span className="flex items-center gap-2">
-              <Settings2 size={16} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/75">
-                Inference Settings
-              </span>
-            </span>
-            {isSettingsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-
-          <div className={`grid transition-[grid-template-rows,opacity,margin] duration-300 ${isSettingsExpanded ? 'mt-5 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'}`}>
-            <div className="min-h-0 overflow-hidden">
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-[10px] text-sidebar-foreground/75 uppercase tracking-wider">Active engine</Label>
-                  <Select value={activeConfigId} onValueChange={setActiveConfigId}>
-                    <SelectTrigger className="w-full bg-sidebar-accent border-sidebar-border text-sidebar-accent-foreground h-9 text-xs focus:ring-sidebar-ring">
-                      <SelectValue placeholder="Select Model" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-sidebar border-sidebar-border text-sidebar-foreground shadow-lg">
-                      {models.map((model) => (
-                        <SelectItem key={model.config_id} value={model.config_id.toString()} className="text-xs focus:bg-sidebar-accent focus:text-sidebar-accent-foreground">
-                          {model.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+        <div className={`mt-auto border-t border-sidebar-border transition-all duration-300 ${isCollapsed ? 'invisible h-0 overflow-hidden p-0 opacity-0' : 'p-5 opacity-100'}`}>
+          <p className="text-[10px] font-black uppercase tracking-widest text-sidebar-foreground/70">
+            Runtime Models
+          </p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-md border border-sidebar-border bg-sidebar-accent p-3">
+              <div className="flex items-center gap-2 text-sidebar-foreground/70">
+                <Cpu className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider">Embedding</span>
               </div>
+              <p className="mt-1.5 truncate text-xs font-medium text-sidebar-accent-foreground" title={runtimeModels.embedding_model || "Unavailable"}>
+                {runtimeModels.embedding_model || "Unavailable"}
+              </p>
+            </div>
+            <div className="rounded-md border border-sidebar-border bg-sidebar-accent p-3">
+              <div className="flex items-center gap-2 text-sidebar-foreground/70">
+                <Bot className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-[10px] font-semibold uppercase tracking-wider">LLM</span>
+              </div>
+              <p className="mt-1.5 truncate text-xs font-medium text-sidebar-accent-foreground" title={runtimeModels.llm_model || "Unavailable"}>
+                {runtimeModels.llm_model || "Unavailable"}
+              </p>
             </div>
           </div>
         </div>
@@ -140,6 +146,13 @@ export default function App() {
           <UploadPage 
             onAnalysisComplete={handleNewAnalysis} 
             activeConfigId={activeConfigId}
+          />
+        )}
+        {currentView === "models" && (
+          <ModelConfigsPage
+            models={models}
+            isLoading={isModelsLoading}
+            error={modelsError}
           />
         )}
         {currentView === "prompts" && <PromptLab />}

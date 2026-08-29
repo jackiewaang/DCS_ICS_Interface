@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
@@ -9,25 +10,29 @@ router = APIRouter(prefix="/api/feedback", tags=["Feedback"])
 
 
 class FeedbackCreate(BaseModel):
-    rating: int = Field(ge=1, le=5)
-    message: str = Field(min_length=1, max_length=5000)
+    tool_usefulness: int = Field(ge=1, le=5)
+    score_reasonability: int = Field(ge=1, le=5)
+    ease_of_use: int = Field(ge=1, le=5)
+    identified_improvements: Literal["yes", "somewhat", "no"]
+    comments: str | None = Field(default=None, max_length=5000)
 
-    @field_validator("message")
+    @field_validator("comments")
     @classmethod
-    def validate_message(cls, value: str) -> str:
-        message = value.strip()
-        if not message:
-            raise ValueError("Feedback message cannot be empty")
-        return message
+    def validate_comments(cls, value: str | None) -> str | None:
+        comments = value.strip() if value else ""
+        return comments or None
 
 
 class FeedbackResponse(BaseModel):
     feedback_id: int
-    rating: int
-    message: str
+    tool_usefulness: int
+    score_reasonability: int
+    ease_of_use: int
+    identified_improvements: Literal["yes", "somewhat", "no"]
+    comments: str | None
     created_at: datetime
 
 
 @router.post("/", response_model=FeedbackResponse, status_code=201)
 def submit_feedback(payload: FeedbackCreate):
-    return create_feedback(rating=payload.rating, message=payload.message)
+    return create_feedback(**payload.model_dump())

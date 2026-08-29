@@ -1,10 +1,13 @@
 import asyncio
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
+import requests
+from dotenv import dotenv_values
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -27,7 +30,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
-LOGS_DIR = Path(__file__).resolve().parents[4] / "logs-users"
+REPO_ROOT = Path(__file__).resolve().parents[4]
+LOGS_DIR = REPO_ROOT / "logs-users"
+EMBEDDING_ENV_PATH = REPO_ROOT / "embedding" / ".env"
+VLLM_ENV_PATH = REPO_ROOT / "vllm" / ".env"
+EMBEDDING_HEALTH_URL = os.getenv(
+    "EMBEDDING_HEALTH_URL",
+    "http://localhost:8001/health",
+)
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8002/v1").rstrip("/")
+RUNTIME_MODEL_LOOKUP_TIMEOUT = 2
 
 
 class InferenceSections(BaseModel):
@@ -37,6 +49,30 @@ class InferenceSections(BaseModel):
     summary: str = ""
     research: str = ""
     impact: str = ""
+
+
+@router.get("/runtime-models")
+def get_runtime_models():
+    embedding_model = _read_env_value(EMBEDDING_ENV_PATH, "EMBEDDING_MODEL")
+    llm_model = _read_env_value(VLLM_ENV_PATH, "LLM_MODEL_NAME")
+
+    embedding_source = "environment"
+    llm_source = "environment"
+
+    if not embedding_model:
+        embedding_model = _get_embedding_endpoint_model()
+        embedding_source = "service" if embedding_model else "unavailable"
+
+    if not llm_model:
+        llm_model = _get_llm_endpoint_model()
+        llm_source = "service" if llm_model else "unavailable"
+
+    return {
+        "embedding_model": embedding_model,
+        "embedding_source": embedding_source,
+        "llm_model": llm_model,
+        "llm_source": llm_source,
+    }
 
 
 @router.get("/models")
@@ -53,6 +89,45 @@ def list_models():
             }
             for model in models
         ]
+
+
+def _read_env_value(env_path: Path, key: str) -> str | None:
+    try:
+        value = dotenv_values(env_path).get(key)
+    except (OSError, ValueError):
+        logger.warning("Could not read runtime model environment file: %s", env_path)
+        return None
+
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _get_embedding_endpoint_model() -> str | None:
+    try:
+        response = requests.get(
+            EMBEDDING_HEALTH_URL,
+            timeout=RUNTIME_MODEL_LOOKUP_TIMEOUT,
+        )
+        response.raise_for_status()
+        model = response.json().get("model")
+        return model.strip() if isinstance(model, str) and model.strip() else None
+    except (requests.RequestException, ValueError, TypeError):
+        logger.warning("Could not retrieve the embedding model from %s", EMBEDDING_HEALTH_URL)
+        return None
+
+
+def _get_llm_endpoint_model() -> str | None:
+    try:
+        response = requests.get(
+            f"{VLLM_BASE_URL}/models",
+            timeout=RUNTIME_MODEL_LOOKUP_TIMEOUT,
+        )
+        response.raise_for_status()
+        models = response.json().get("data") or []
+        model = models[0].get("id") if models else None
+        return model.strip() if isinstance(model, str) and model.strip() else None
+    except (requests.RequestException, ValueError, TypeError, AttributeError):
+        logger.warning("Could not retrieve the LLM model from %s/models", VLLM_BASE_URL)
+        return None
 
 
 @router.post("/inference")

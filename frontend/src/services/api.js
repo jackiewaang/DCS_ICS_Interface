@@ -69,6 +69,11 @@ export const api = {
     return handleResponse(response);
   },
 
+  async getRuntimeModels() {
+    const response = await fetch(`${API_BASE}/analysis/runtime-models`);
+    return handleResponse(response);
+  },
+
   // --- ANALYSIS ENGINE ---
   async runAnalysis(file, configId) {
     const formData = new FormData();
