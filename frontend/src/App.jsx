@@ -9,11 +9,14 @@ import UploadPage from "./pages/UploadPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
+const LLM_TIMEOUT_MS = 305_000;
+
 export default function App() {
   const [currentView, setCurrentView] = useState("upload");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
+  const [uploadInferenceResult, setUploadInferenceResult] = useState(null);
   const [models, setModels] = useState([]);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
@@ -25,6 +28,8 @@ export default function App() {
   const [runtimeModelsError, setRuntimeModelsError] = useState("");
   const modelsRequestId = useRef(0);
   const runtimeModelsRequestId = useRef(0);
+  const llmRequests = useRef(new Map());
+  const llmStartedIds = useRef(new Set());
 
   const fetchModels = useCallback(async () => {
     const requestId = ++modelsRequestId.current;
@@ -74,17 +79,92 @@ export default function App() {
     fetchRuntimeModels();
   }, [fetchRuntimeModels]);
 
-  const handleAnalysisUpdate = useCallback((result) => {
+  const updateLlmFeedback = useCallback((inferenceId, llmFeedback) => {
+    setInferenceHistory((current) => current.map((item) => (
+      item.inference_id === inferenceId
+        ? { ...item, llm_feedback: llmFeedback }
+        : item
+    )));
+    setUploadInferenceResult((current) => (
+      current?.inference_id === inferenceId
+        ? { ...current, llm_feedback: llmFeedback }
+        : current
+    ));
+  }, []);
+
+  const startLlmFeedback = useCallback((result) => {
+    const inferenceId = result.inference_id;
+    if (!inferenceId || !result.llm_input || llmStartedIds.current.has(inferenceId)) return;
+
+    const controller = new AbortController();
+    const request = { controller, didTimeout: false, timeoutId: null };
+    request.timeoutId = window.setTimeout(() => {
+      request.didTimeout = true;
+      controller.abort();
+    }, LLM_TIMEOUT_MS);
+    llmStartedIds.current.add(inferenceId);
+    llmRequests.current.set(inferenceId, request);
+
+    api.getLLMFeedback(result.llm_input, controller.signal)
+      .then((feedback) => {
+        updateLlmFeedback(inferenceId, {
+          result: feedback,
+          status: "completed",
+          errorMessage: "",
+        });
+      })
+      .catch((error) => {
+        if (error.name === "AbortError" && !request.didTimeout) return;
+        updateLlmFeedback(inferenceId, {
+          result: null,
+          status: "error",
+          errorMessage: request.didTimeout
+            ? "AI insight generation timed out after five minutes."
+            : getUserErrorMessage(error, "AI insights could not be generated. Please try again later."),
+        });
+      })
+      .finally(() => {
+        window.clearTimeout(request.timeoutId);
+        if (llmRequests.current.get(inferenceId) === request) {
+          llmRequests.current.delete(inferenceId);
+        }
+      });
+  }, [updateLlmFeedback]);
+
+  useEffect(() => () => {
+    llmRequests.current.forEach(({ controller, timeoutId }) => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    });
+    llmRequests.current.clear();
+    llmStartedIds.current.clear();
+  }, []);
+
+  const handleAnalysisComplete = useCallback((result) => {
+    const sharedResult = {
+      ...result,
+      llm_feedback: result.llm_feedback || (result.llm_input
+        ? { result: null, status: "running", errorMessage: "" }
+        : { result: null, status: "not_found", errorMessage: "" }),
+    };
+
     setInferenceHistory((current) => {
-      const existingIndex = current.findIndex((item) => item.inference_id === result.inference_id);
+      const existingIndex = current.findIndex((item) => item.inference_id === sharedResult.inference_id);
       if (existingIndex === -1) {
-        return [result, ...current];
+        return [sharedResult, ...current];
       }
 
-      return current.map((item, index) => index === existingIndex ? result : item);
+      return current.map((item, index) => index === existingIndex ? sharedResult : item);
     });
-    setSelectedHistoryId(result.inference_id);
-  }, []);
+    setUploadInferenceResult(sharedResult);
+    setSelectedHistoryId(sharedResult.inference_id);
+
+    if (sharedResult.llm_feedback.status === "running") {
+      startLlmFeedback(sharedResult);
+    }
+
+    return sharedResult;
+  }, [startLlmFeedback]);
 
   return (
     <div className="flex bg-background overflow-hidden h-screen w-full text-foreground">
@@ -171,12 +251,13 @@ export default function App() {
             history={inferenceHistory}
             selectedId={selectedHistoryId}
             onSelect={setSelectedHistoryId}
-            onResultUpdate={handleAnalysisUpdate}
           />
         )}
         {currentView === "upload" && (
           <UploadPage 
-            onAnalysisComplete={handleAnalysisUpdate}
+            inferenceResult={uploadInferenceResult}
+            onAnalysisComplete={handleAnalysisComplete}
+            onClearAnalysis={() => setUploadInferenceResult(null)}
             activeConfigId={activeConfigId}
             modelsError={modelsError || (!isModelsLoading && models.length === 0
               ? "No inference models are currently registered."

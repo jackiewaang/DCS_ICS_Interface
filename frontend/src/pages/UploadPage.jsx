@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { FilePlus2 } from 'lucide-react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
@@ -52,7 +52,14 @@ function hasSectionText(sections) {
   return Boolean(sections.summary || sections.research || sections.impact);
 }
 
-export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsError, onRetryModels }) {
+export default function UploadPage({
+  activeConfigId,
+  inferenceResult,
+  onAnalysisComplete,
+  onClearAnalysis,
+  modelsError,
+  onRetryModels,
+}) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
@@ -61,13 +68,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
   const [inferenceError, setInferenceError] = useState(null);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [collapsedSections, setCollapsedSections] = useState(EXPANDED_SECTIONS);
-  const [inferenceResult, setInferenceResult] = useState(null);
   const fileInputRef = useRef(null);
-
-  const handleResultUpdate = useCallback((result) => {
-    setInferenceResult(result);
-    onAnalysisComplete?.(result);
-  }, [onAnalysisComplete]);
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files?.[0];
@@ -79,7 +80,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
     if (!isPdf) {
       setFile(null);
       setDraft(EMPTY_DRAFT);
-      setInferenceResult(null);
+      onClearAnalysis?.();
       setError('Only PDF files are supported.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
@@ -88,7 +89,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
     if (selectedFile.size === 0) {
       setFile(null);
       setDraft(EMPTY_DRAFT);
-      setInferenceResult(null);
+      onClearAnalysis?.();
       setError('The selected PDF is empty. Choose a valid case-study file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
@@ -97,7 +98,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
     setFile(selectedFile);
     setDraft(EMPTY_DRAFT); 
     setCollapsedSections(EXPANDED_SECTIONS);
-    setInferenceResult(null);
+    onClearAnalysis?.();
     setError(null);
     setInferenceError(null);
   };
@@ -122,7 +123,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
         },
       });
       setCollapsedSections(EXPANDED_SECTIONS);
-      setInferenceResult(null);
+      onClearAnalysis?.();
     } catch (err) {
       console.error('Upload Error:', err);
       setError(getUserErrorMessage(err, 'Could not extract REF sections from the uploaded PDF.'));
@@ -138,7 +139,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
 
     setIsRunningInference(true);
     setInferenceError(null);
-    setInferenceResult(null);
+    onClearAnalysis?.();
 
     try {
       const startedAt = performance.now();
@@ -147,7 +148,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
         sections: draft.sections,
       });
       const inferenceTimeMs = Math.round(performance.now() - startedAt);
-      handleResultUpdate({
+      onAnalysisComplete?.({
         ...result,
         inference_time_ms: result.inference_time_ms ?? inferenceTimeMs, // TODO: Check if backend is returning inference_time_ms, if not, use the calculated time
       });
@@ -168,7 +169,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
     setInferenceError(null);
     setDraft(EMPTY_DRAFT);
     setCollapsedSections(EXPANDED_SECTIONS);
-    setInferenceResult(null);
+    onClearAnalysis?.();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -243,7 +244,7 @@ export default function UploadPage({ activeConfigId, onAnalysisComplete, modelsE
           hasDraft={hasDraft}
         />
 
-        <InferenceResults data={inferenceResult} onResultUpdate={handleResultUpdate} />
+        <InferenceResults data={inferenceResult} />
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Clock3, History } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, History, Loader2 } from 'lucide-react';
 import InferenceResults from '@/components/InferenceResults';
 
 function formatDate(value) {
@@ -8,7 +8,22 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? 'This session' : date.toLocaleString();
 }
 
-export default function InferenceHistoryPage({ history, selectedId, onSelect, onResultUpdate }) {
+function LlmStatus({ status, isSelected }) {
+  const tone = isSelected ? 'text-primary-foreground/75' : 'text-muted-foreground';
+
+  if (status === 'running') {
+    return <span className={`mt-2 flex items-center gap-1.5 text-[11px] ${tone}`}><Loader2 className="h-3 w-3 animate-spin" />AI insights generating</span>;
+  }
+  if (status === 'completed') {
+    return <span className={`mt-2 flex items-center gap-1.5 text-[11px] ${tone}`}><CheckCircle2 className="h-3 w-3" />AI insights ready</span>;
+  }
+  if (status === 'error') {
+    return <span className={`mt-2 flex items-center gap-1.5 text-[11px] ${tone}`}><AlertCircle className="h-3 w-3" />AI insights failed</span>;
+  }
+  return null;
+}
+
+export default function InferenceHistoryPage({ history, selectedId, onSelect }) {
   const selectedResult = history.find((item) => item.inference_id === selectedId) || history[0] || null;
 
   return (
@@ -73,6 +88,7 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect, on
                         <Clock3 className="h-3 w-3" />
                         {formatDate(result.created_at)}
                       </p>
+                      <LlmStatus status={result.llm_feedback?.status} isSelected={isSelected} />
                     </button>
                   );
                 })}
@@ -82,7 +98,7 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect, on
         </aside>
 
         <div className="min-h-0">
-          <InferenceResults data={selectedResult} onResultUpdate={onResultUpdate} />
+          <InferenceResults data={selectedResult} />
         </div>
       </div>
     </div>

@@ -8,7 +8,6 @@ import FeaturesPanel from '@/components/dashboard/FeaturesPanel';
 import EntitiesPanel from '@/components/dashboard/EntitiesPanel';
 import { Button } from '@/components/ui/button';
 import ErrorAlert from '@/components/ui/ErrorAlert';
-import useLLMFeedback from '@/hooks/useLLMFeedback';
 import { exportAnalysisPdf } from '@/services/exportAnalysisPdf';
 import { getUserErrorMessage } from '@/helper/error_messages';
 
@@ -20,29 +19,15 @@ const TABS = [
   { id: 'entities', label: 'Entities' },
 ];
 
-export default function InferenceResults({ data, onResultUpdate }) {
+export default function InferenceResults({ data }) {
   const [activeTab, setActiveTab] = useState('main');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [exportError, setExportError] = useState('');
-  const savedLlmState = data?.llm_feedback;
-  const hasSavedFeedback = ['completed', 'error'].includes(savedLlmState?.status);
-  const generatedLlmState = useLLMFeedback(hasSavedFeedback ? null : data?.llm_input);
-  const llmState = hasSavedFeedback ? savedLlmState : generatedLlmState;
-
-  useEffect(() => {
-    if (!data || hasSavedFeedback || !['completed', 'error'].includes(generatedLlmState.status)) {
-      return;
-    }
-
-    onResultUpdate?.({
-      ...data,
-      llm_feedback: {
-        result: generatedLlmState.result,
-        status: generatedLlmState.status,
-        errorMessage: generatedLlmState.errorMessage,
-      },
-    });
-  }, [data, generatedLlmState, hasSavedFeedback, onResultUpdate]);
+  const llmState = data?.llm_feedback || {
+    result: null,
+    status: data?.llm_input ? 'running' : 'not_found',
+    errorMessage: '',
+  };
 
   useEffect(() => {
     if (!isFullscreen) return undefined;
