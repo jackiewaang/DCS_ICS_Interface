@@ -1,33 +1,6 @@
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
-import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
-import useLLMInference from '@/hooks/useLLMInference';
-
-const INSIGHT_CATEGORIES = [
-  {
-    key: 'significance_limitations',
-    title: 'Significance Limitations',
-    description: 'Risks that could weaken the interpretation or defensibility of the claimed impact.',
-  },
-  {
-    key: 'significance_improvements',
-    title: 'Significance Improvements',
-    description: 'Changes that would make the impact claim more compelling and decision-ready.',
-  },
-  {
-    key: 'outreach_limitations',
-    title: 'Outreach Limitations',
-    description: 'Gaps that make the breadth, uptake, or beneficiary coverage harder to assess.',
-  },
-  {
-    key: 'outreach_improvements',
-    title: 'Outreach Improvements',
-    description: 'Changes that would make reach and audience adoption easier to evaluate.',
-  },
-];
-
-function SectionTooltip({ text }) {
-  return <DashboardHelp text={text} />;
-}
+import { DashboardPanelFrame } from '@/components/dashboard/DashboardPanelFrame';
+import { INSIGHT_CATEGORIES } from '@/helper/analysis_display';
 
 function StatusBanner({ status, errorMessage }) {
   const isRunning = status === 'loading' || status === 'running';
@@ -36,6 +9,7 @@ function StatusBanner({ status, errorMessage }) {
 
   return (
     <div
+      role={isError ? 'alert' : 'status'}
       className={`flex items-start gap-3 rounded-md border px-4 py-3 text-sm ${
         isError
           ? 'border-destructive/30 bg-destructive/5 text-destructive'
@@ -51,7 +25,7 @@ function StatusBanner({ status, errorMessage }) {
           {isError && 'AI insight generation failed'}
         </p>
         <p className="leading-relaxed">
-          {isRunning && 'The panel is polling the LLM inference endpoint for the generated review responses.'}
+          {isRunning && 'The LLM is reviewing the current inference results.'}
           {isNotFound && 'This inference does not have an associated LLM insight result.'}
           {isError && (errorMessage || 'The LLM service returned an error while generating the review.')}
         </p>
@@ -88,10 +62,7 @@ function InsightCard({ title, description, items }) {
   );
 }
 
-export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
-  const inferenceId = data?.inference_id;
-  const internalLlmState = useLLMInference(providedLlmState ? null : inferenceId);
-  const llmState = providedLlmState || internalLlmState;
+export default function AIInsightsPanel({ data, llmState }) {
 
   if (!data) {
     return (
@@ -115,11 +86,9 @@ export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
     </a>
   );
 
-  const llmResult = llmState.inferenceId === inferenceId ? llmState.result : null;
-  const status = inferenceId
-    ? llmState.inferenceId === inferenceId ? llmState.status : 'loading'
-    : 'idle';
-  const errorMessage = llmState.inferenceId === inferenceId ? llmState.errorMessage : '';
+  const llmResult = llmState?.result;
+  const status = llmState?.status || 'not_found';
+  const errorMessage = llmState?.errorMessage || '';
   const isCompleted = status === 'completed';
   const panelContent = (
     <div className="space-y-8">
@@ -145,7 +114,6 @@ export default function AIInsightsPanel({ data, llmState: providedLlmState }) {
       title="Limitations and Improvements"
       helpText="AI-generated limitation and improvement feedbacks based on REF guidance."
       headerActions={headerActions}
-      expandedChildren={panelContent}
     >
       {panelContent}
     </DashboardPanelFrame>

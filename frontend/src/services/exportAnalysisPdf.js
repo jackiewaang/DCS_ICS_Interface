@@ -1,15 +1,9 @@
 import { jsPDF } from 'jspdf';
 import { autoTable } from 'jspdf-autotable';
+import { INSIGHT_CATEGORIES } from '@/helper/analysis_display';
 
 const MARGIN = 14;
 const SECTION_GAP = 7;
-
-const LLM_SECTIONS = [
-  ['significance_limitations', 'Significance Limitations'],
-  ['significance_improvements', 'Significance Improvements'],
-  ['outreach_limitations', 'Outreach Limitations'],
-  ['outreach_improvements', 'Outreach Improvements'],
-];
 
 function formatValue(value) {
   if (value === null || value === undefined || value === '') {
@@ -153,7 +147,7 @@ function addLlmInsights(doc, llmState, y) {
     return addText(doc, 'Generated insights were not available when this report was exported.', nextY);
   }
 
-  LLM_SECTIONS.forEach(([key, title]) => {
+  INSIGHT_CATEGORIES.forEach(({ key, title }) => {
     nextY = addHeading(doc, title, nextY);
     const items = Array.isArray(llmState.result[key]) ? llmState.result[key] : [];
     const body = items.length > 0

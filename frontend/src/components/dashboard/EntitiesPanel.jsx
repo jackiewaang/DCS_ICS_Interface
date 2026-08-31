@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { formatWeight, getObservedRange } from '@/helper/analysis_display';
 import { decodeHTML } from '@/helper/utils';
 import { METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_definitions';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
@@ -20,23 +21,6 @@ function getCategoryItems(entities, category) {
   const rawItems = category.aliases.flatMap((alias) => entities?.[alias] || []);
 
   return Array.from(new Set(rawItems.map((item) => decodeHTML(String(item)).trim()))).filter(Boolean);
-}
-
-function getObservedRange(rows, key) {
-  if (!rows.length) {
-    return 'N/A';
-  }
-
-  const values = rows.map((row) => Number(row[key])).filter((value) => Number.isFinite(value));
-
-  if (!values.length) {
-    return 'N/A';
-  }
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  return `${min.toFixed(4)} - ${max.toFixed(4)}`;
 }
 
 function EntitiesContent({ data, activeCategory, setActiveCategory }) {
@@ -118,13 +102,13 @@ function EntitiesContent({ data, activeCategory, setActiveCategory }) {
                   <td className="px-4 py-4 text-sm text-muted-foreground">{row.interpretation}</td>
                   {/* <td className="px-4 py-4 text-sm text-muted-foreground">{row.range}</td> */}
                   {/* <td className="px-4 py-4 text-sm text-muted-foreground">{row.bestRange}</td> */}
-                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.localRaw.toFixed(4)}</td>
-                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.globalRaw.toFixed(4)}</td>
+                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.localRaw)}</td>
+                  <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.globalRaw)}</td>
                   <td className="px-4 py-4">
                     <button
                       type="button"
                       onClick={() => setActiveCategory(isActive ? null : row.id)}
-                      className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+                      className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
                     >
                       {isActive ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {isActive ? 'Hide list' : 'Show list'}
@@ -183,7 +167,6 @@ export default function EntitiesPanel({ data }) {
     <DashboardPanelFrame
       title="Entities"
       helpText="Entities extracted from the document using Named Entity Recognition grouped into relevant categories with unique counts and expandable lists."
-      expandedChildren={<EntitiesContent data={data} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />}
     >
       <EntitiesContent data={data} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
     </DashboardPanelFrame>

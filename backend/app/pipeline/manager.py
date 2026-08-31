@@ -14,7 +14,7 @@ from app.repositories.model_config_repository import get_model_config
 
 logger = logging.getLogger(__name__)
 
-SAVE_EMBEDDINGS_PICKLE = True
+SAVE_EMBEDDINGS_PICKLE = False
 EMBEDDING_SERVER_URL = "http://localhost:8001"
 CLASSIFICATION_PROMPT = (
     "Given a text from a research impact report, classify the research impact "

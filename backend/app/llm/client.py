@@ -2,9 +2,13 @@
 import os
 from openai import AsyncOpenAI
 
+LLM_TIMEOUT_SECONDS = 300
+
 client = AsyncOpenAI(
     api_key="EMPTY",
-    base_url=os.getenv("VLLM_BASE_URL")
+    base_url=os.getenv("VLLM_BASE_URL"),
+    timeout=LLM_TIMEOUT_SECONDS,
+    max_retries=0,
 )
 
 async def generate(messages):

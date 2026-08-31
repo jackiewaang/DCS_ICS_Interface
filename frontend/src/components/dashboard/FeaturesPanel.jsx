@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ArrowDownAZ, ArrowDownWideNarrow, ChevronDown, ChevronUp } from 'lucide-react';
+import { formatWeight, getObservedRange } from '@/helper/analysis_display';
 import { ENTITY_METRIC_KEYS, METRIC_DEFINITIONS, getDefaultDefinition } from '@/helper/metric_definitions';
 import { DashboardPanelFrame, DashboardHelp } from '@/components/dashboard/DashboardPanelFrame';
 
@@ -46,23 +47,6 @@ function getValueLabel(value, format) {
   }
 
   return format(numericValue);
-}
-
-function getObservedRange(rows, key) {
-  if (!rows.length) {
-    return 'N/A';
-  }
-
-  const values = rows.map((row) => Number(row[key])).filter((value) => Number.isFinite(value));
-
-  if (!values.length) {
-    return 'N/A';
-  }
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-
-  return `${min.toFixed(4)} - ${max.toFixed(4)}`;
 }
 
 function getFeatureRows(data, sortMode) {
@@ -175,7 +159,7 @@ export default function FeaturesPanel({ data }) {
           <button
             type="button"
             onClick={() => setSortMode((current) => (current === 'global' ? 'local' : 'global'))}
-            className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
+            className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
           >
             {sortMode === 'global' ? <ArrowDownWideNarrow className="h-4 w-4" /> : <ArrowDownAZ className="h-4 w-4" />}
             Sort by {sortMode === 'global' ? 'Local Weight' : 'Global Weight'}
@@ -215,8 +199,8 @@ export default function FeaturesPanel({ data }) {
                       <td className="px-4 py-4 text-sm text-muted-foreground">{row.definition.range || 'N/A'}</td>
                       <td className="px-4 py-4 text-sm text-muted-foreground">{row.bestRange}</td>
                       <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{getValueLabel(row.value, row.definition.format)}</td>
-                      <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.localRaw.toFixed(4)}</td>
-                      <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{row.globalRaw.toFixed(4)}</td>
+                      <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.localRaw)}</td>
+                      <td className="px-4 py-4 text-sm font-semibold text-foreground tabular-nums">{formatWeight(row.globalRaw)}</td>
                     </tr>
                   );
                 })}
@@ -232,7 +216,6 @@ export default function FeaturesPanel({ data }) {
     <DashboardPanelFrame
       title="Features"
       helpText="Features extracted from the document and their importance weights for the model's classification decision. "
-      expandedChildren={panelContent}
     >
       {panelContent}
     </DashboardPanelFrame>

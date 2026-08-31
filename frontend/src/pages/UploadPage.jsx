@@ -1,7 +1,10 @@
 import { useRef, useState } from 'react';
+import { FilePlus2 } from 'lucide-react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
 import SectionEditor from '@/components/SectionEditor';
+import ErrorAlert from '@/components/ui/ErrorAlert';
+import { getUserErrorMessage } from '@/helper/error_messages';
 
 const SECTION_FIELDS = [
   {
@@ -49,7 +52,14 @@ function hasSectionText(sections) {
   return Boolean(sections.summary || sections.research || sections.impact);
 }
 
-export default function UploadPage({ activeConfigId }) {
+export default function UploadPage({
+  activeConfigId,
+  inferenceResult,
+  onAnalysisComplete,
+  onClearAnalysis,
+  modelsError,
+  onRetryModels,
+}) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
@@ -58,7 +68,6 @@ export default function UploadPage({ activeConfigId }) {
   const [inferenceError, setInferenceError] = useState(null);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [collapsedSections, setCollapsedSections] = useState(EXPANDED_SECTIONS);
-  const [inferenceResult, setInferenceResult] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (event) => {
@@ -71,8 +80,17 @@ export default function UploadPage({ activeConfigId }) {
     if (!isPdf) {
       setFile(null);
       setDraft(EMPTY_DRAFT);
-      setInferenceResult(null);
+      onClearAnalysis?.();
       setError('Only PDF files are supported.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (selectedFile.size === 0) {
+      setFile(null);
+      setDraft(EMPTY_DRAFT);
+      onClearAnalysis?.();
+      setError('The selected PDF is empty. Choose a valid case-study file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -80,7 +98,7 @@ export default function UploadPage({ activeConfigId }) {
     setFile(selectedFile);
     setDraft(EMPTY_DRAFT); 
     setCollapsedSections(EXPANDED_SECTIONS);
-    setInferenceResult(null);
+    onClearAnalysis?.();
     setError(null);
     setInferenceError(null);
   };
@@ -105,10 +123,10 @@ export default function UploadPage({ activeConfigId }) {
         },
       });
       setCollapsedSections(EXPANDED_SECTIONS);
-      setInferenceResult(null);
+      onClearAnalysis?.();
     } catch (err) {
       console.error('Upload Error:', err);
-      setError(err.message || 'Could not extract REF sections from the uploaded PDF.');
+      setError(getUserErrorMessage(err, 'Could not extract REF sections from the uploaded PDF.'));
     } finally {
       setIsUploading(false);
     }
@@ -121,6 +139,7 @@ export default function UploadPage({ activeConfigId }) {
 
     setIsRunningInference(true);
     setInferenceError(null);
+    onClearAnalysis?.();
 
     try {
       const startedAt = performance.now();
@@ -129,14 +148,14 @@ export default function UploadPage({ activeConfigId }) {
         sections: draft.sections,
       });
       const inferenceTimeMs = Math.round(performance.now() - startedAt);
-      setInferenceResult({
+      onAnalysisComplete?.({
         ...result,
         inference_time_ms: result.inference_time_ms ?? inferenceTimeMs, // TODO: Check if backend is returning inference_time_ms, if not, use the calculated time
       });
       setCollapsedSections(COLLAPSED_SECTIONS);
     } catch (err) {
       console.error('Inference Error:', err);
-      setInferenceError(err.message || 'Could not run inference for the current draft.');
+      setInferenceError(getUserErrorMessage(err, 'Could not run inference for the current draft.'));
     } finally {
       setIsRunningInference(false);
     }
@@ -150,7 +169,7 @@ export default function UploadPage({ activeConfigId }) {
     setInferenceError(null);
     setDraft(EMPTY_DRAFT);
     setCollapsedSections(EXPANDED_SECTIONS);
-    setInferenceResult(null);
+    onClearAnalysis?.();
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -176,14 +195,29 @@ export default function UploadPage({ activeConfigId }) {
 
   return (
     <div className="flex min-h-full w-full flex-col gap-6 p-6 md:p-8">
-      <header className="shrink-0 space-y-2 border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-[2rem]">
-          New Case Draft
-        </h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-slate-500">
-          Upload a PDF, edit the extracted REF sections, then run inference with the active model.
-        </p>
+      <header className="shrink-0 border-b border-border pb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <FilePlus2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-[2rem]">
+              New Case Draft
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Upload a PDF, edit the extracted REF sections, then run inference with the active model.
+            </p>
+          </div>
+        </div>
       </header>
+
+      {modelsError ? (
+        <ErrorAlert
+          title="Inference models are unavailable"
+          message={modelsError}
+          onRetry={onRetryModels}
+        />
+      ) : null}
 
       <div className={`grid min-h-0 flex-1 items-stretch gap-5 ${isEditorCollapsed ? 'grid-cols-[4rem_minmax(0,1fr)]' : 'grid-cols-1 xl:grid-cols-[minmax(28rem,0.86fr)_minmax(0,1.14fr)]'}`}>
         <SectionEditor

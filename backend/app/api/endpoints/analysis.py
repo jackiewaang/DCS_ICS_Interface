@@ -1,19 +1,22 @@
-import asyncio
 import json
 import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+import requests
+from dotenv import dotenv_values
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.llm.service import generate_review
+from app.llm.service import generate_feedback
 from app.models.document import DocumentFeatures, DocumentMetadata
 from app.models.inference import (
     Attention,
     Inference,
-    LLMInference,
-    LLMInferenceStatus,
     ModelConfig,
 )
 from app.pipeline.manager import PipelineManager
@@ -24,6 +27,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
+REPO_ROOT = Path(__file__).resolve().parents[4]
+LOGS_DIR = REPO_ROOT / "logs-users"
+EMBEDDING_ENV_PATH = REPO_ROOT / "embedding" / ".env"
+VLLM_ENV_PATH = REPO_ROOT / "vllm" / ".env"
+EMBEDDING_HEALTH_URL = os.getenv(
+    "EMBEDDING_HEALTH_URL",
+    "http://localhost:8001/health",
+)
+VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8002/v1").rstrip("/")
+RUNTIME_MODEL_LOOKUP_TIMEOUT = 2
 
 
 class InferenceSections(BaseModel):
@@ -33,6 +46,39 @@ class InferenceSections(BaseModel):
     summary: str = ""
     research: str = ""
     impact: str = ""
+
+
+class LLMInput(BaseModel):
+    prediction_label: str | None = None
+    score: float | None = None
+    top_sentences: list[dict] = Field(default_factory=list)
+    top_features: list[dict] = Field(default_factory=list)
+    summary: str = ""
+    details: str = ""
+
+
+@router.get("/runtime-models")
+def get_runtime_models():
+    embedding_model = _read_env_value(EMBEDDING_ENV_PATH, "EMBEDDING_MODEL")
+    llm_model = _read_env_value(VLLM_ENV_PATH, "LLM_MODEL_NAME")
+
+    embedding_source = "environment"
+    llm_source = "environment"
+
+    if not embedding_model:
+        embedding_model = _get_embedding_endpoint_model()
+        embedding_source = "service" if embedding_model else "unavailable"
+
+    if not llm_model:
+        llm_model = _get_llm_endpoint_model()
+        llm_source = "service" if llm_model else "unavailable"
+
+    return {
+        "embedding_model": embedding_model,
+        "embedding_source": embedding_source,
+        "llm_model": llm_model,
+        "llm_source": llm_source,
+    }
 
 
 @router.get("/models")
@@ -51,8 +97,51 @@ def list_models():
         ]
 
 
+def _read_env_value(env_path: Path, key: str) -> str | None:
+    try:
+        value = dotenv_values(env_path).get(key)
+    except (OSError, ValueError):
+        logger.warning("Could not read runtime model environment file: %s", env_path)
+        return None
+
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
+def _get_embedding_endpoint_model() -> str | None:
+    try:
+        response = requests.get(
+            EMBEDDING_HEALTH_URL,
+            timeout=RUNTIME_MODEL_LOOKUP_TIMEOUT,
+        )
+        response.raise_for_status()
+        model = response.json().get("model")
+        return model.strip() if isinstance(model, str) and model.strip() else None
+    except (requests.RequestException, ValueError, TypeError):
+        logger.warning("Could not retrieve the embedding model from %s", EMBEDDING_HEALTH_URL)
+        return None
+
+
+def _get_llm_endpoint_model() -> str | None:
+    try:
+        response = requests.get(
+            f"{VLLM_BASE_URL}/models",
+            timeout=RUNTIME_MODEL_LOOKUP_TIMEOUT,
+        )
+        response.raise_for_status()
+        models = response.json().get("data") or []
+        model = models[0].get("id") if models else None
+        return model.strip() if isinstance(model, str) and model.strip() else None
+    except (requests.RequestException, ValueError, TypeError, AttributeError):
+        logger.warning("Could not retrieve the LLM model from %s/models", VLLM_BASE_URL)
+        return None
+
+
 @router.post("/inference")
-async def run_inference(config_id: int, sections: InferenceSections):
+async def run_inference(
+    config_id: int,
+    sections: InferenceSections,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
     section_payload = sections.model_dump()
     output = pipeline_manager.run_inference(
         section_payload,
@@ -62,61 +151,91 @@ async def run_inference(config_id: int, sections: InferenceSections):
         config_id=config_id,
         feature_names=output.get("feature_names", []),
     )
-    output.update(_save_inference_output(
-        config_id=config_id,
-        sections=sections,
-        output=output,
-    ))
-    _create_llm_inference(output["inference_id"])
-    asyncio.create_task(_run_llm_review(output["inference_id"]))
+    _log_inference(user_id, config_id, sections, output["score"])
+    output["llm_input"] = _build_llm_input(sections, output)
 
     return output
 
 
-@router.get("/llm-inference/{inference_id}")
-def get_llm_inference(inference_id: int):
-    with SessionLocal() as db:
-        llm_inference = db.scalar(
-            select(LLMInference).where(LLMInference.inference_id == inference_id)
+@router.post("/llm-feedback")
+async def run_llm_feedback(
+    llm_input: LLMInput,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    if not (LOGS_DIR / str(user_id)).is_dir():
+        raise HTTPException(
+            status_code=403,
+            detail="Run MIL inference before requesting LLM feedback.",
         )
 
-        if llm_inference is None:
-            raise HTTPException(status_code=404, detail="LLM inference result not found")
+    try:
+        return await generate_feedback(llm_input.model_dump())
+    except Exception as exc:
+        logger.exception("LLM feedback generation failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-        status = _status_value(llm_inference.status)
-        if status == LLMInferenceStatus.ERROR.value:
-            return {
-                "inference_id": inference_id,
-                "status": status,
-                "error_message": llm_inference.error_message,
+
+def _log_inference(
+    user_id: UUID,
+    config_id: int,
+    sections: InferenceSections,
+    score: float,
+) -> None:
+    user_dir = LOGS_DIR / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    entry = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "config_id": config_id,
+        "inputs": {
+            "summary": sections.summary,
+            "research": sections.research,
+            "impact": sections.impact,
+        },
+        "output": {"prediction_score": score},
+    }
+    with (user_dir / "inferences.jsonl").open("a", encoding="utf-8") as log_file:
+        log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def _build_llm_input(sections: InferenceSections, output: dict) -> dict:
+    top_sentences = sorted(
+        (
+            {"sentence_text": sentence, "weight": weight}
+            for sentence, weight in zip(
+                output.get("sentences") or [],
+                output.get("attention") or [],
+            )
+        ),
+        key=lambda item: item["weight"],
+        reverse=True,
+    )[:10]
+
+    features = output.get("features") or {}
+    top_features = sorted(
+        (
+            {
+                "feature_name": name,
+                "local_weight": weight,
+                "value": features[name],
             }
+            for name, weight in zip(
+                output.get("feature_names") or [],
+                output.get("feature_gates") or [],
+            )
+            if name in features
+        ),
+        key=lambda item: item["local_weight"],
+        reverse=True,
+    )[:10]
 
-        if status == LLMInferenceStatus.COMPLETED.value:
-            return {
-                "inference_id": inference_id,
-                "status": status,
-                "significance_limitations": _json_loads(
-                    llm_inference.significance_limitations,
-                    default=[],
-                ),
-                "significance_improvements": _json_loads(
-                    llm_inference.significance_improvements,
-                    default=[],
-                ),
-                "outreach_limitations": _json_loads(
-                    llm_inference.outreach_limitations,
-                    default=[],
-                ),
-                "outreach_improvements": _json_loads(
-                    llm_inference.outreach_improvements,
-                    default=[],
-                ),
-            }
-
-        return {
-            "inference_id": inference_id,
-            "status": status,
-        }
+    return {
+        "prediction_label": output.get("label"),
+        "score": output.get("score"),
+        "top_sentences": top_sentences,
+        "top_features": top_features,
+        "summary": sections.summary,
+        "details": sections.impact,
+    }
 
 
 def _save_inference_output(
@@ -191,37 +310,6 @@ def _save_inference_output(
         }
 
 
-def _create_llm_inference(inference_id: int) -> None:
-    with SessionLocal() as db:
-        db.add(
-            LLMInference(
-                inference_id=inference_id,
-                status=LLMInferenceStatus.RUNNING,
-            )
-        )
-        db.commit()
-
-
-async def _run_llm_review(inference_id: int) -> None:
-    try:
-        await generate_review(inference_id)
-    except Exception:
-        logger.exception("LLM review failed: inference_id=%s", inference_id)
-
-
 def _normalise_title(value: str | None) -> str:
     title = (value or "").strip()
     return title or "Untitled inference"
-
-
-def _status_value(status: LLMInferenceStatus | str) -> str:
-    return status.value if isinstance(status, LLMInferenceStatus) else status
-
-
-def _json_loads(value: str | None, default):
-    if not value:
-        return default
-    try:
-        return json.loads(value)
-    except (TypeError, json.JSONDecodeError):
-        return default
