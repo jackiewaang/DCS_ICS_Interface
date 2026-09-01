@@ -22,11 +22,11 @@ class SlurmConfig:
             remote_repo_dir=os.getenv("SLURM_REMOTE_REPO_DIR", "DCS_ICS_Interface"),
             embedding_script=os.getenv(
                 "SLURM_EMBEDDING_SCRIPT",
-                "DCS_ICS_Interface/slurmBackend/run_embedding.sbatch",
+                "DCS_ICS_Interface/backend/slurmBackend/run_embedding.sbatch",
             ),
             llm_script=os.getenv(
                 "SLURM_LLM_SCRIPT",
-                "DCS_ICS_Interface/slurmBackend/run_llm.sbatch",
+                "DCS_ICS_Interface/backend/slurmBackend/run_llm.sbatch",
             ),
             poll_interval=float(os.getenv("SLURM_POLL_INTERVAL", "2")),
             allocation_timeout=float(os.getenv("SLURM_ALLOCATION_TIMEOUT", "30")),

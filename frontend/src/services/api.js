@@ -133,8 +133,15 @@ export const api = {
     return handleResponse(response);
   },
 
-  async runInference(sections, configId, draft = {}) {
-    const response = await fetch(`${API_BASE}/analysis/inference?config_id=${configId}`, {
+  async runInference(sections, configId, draft = {}, slurmModels = {}) {
+    const params = new URLSearchParams({ config_id: configId });
+    if (slurmModels.embeddingModelName) {
+      params.set("embedding_model_name", slurmModels.embeddingModelName);
+    }
+    if (slurmModels.llmModelName) {
+      params.set("llm_model_name", slurmModels.llmModelName);
+    }
+    const response = await fetch(`${API_BASE}/analysis/inference?${params}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

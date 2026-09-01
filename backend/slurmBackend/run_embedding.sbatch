@@ -25,4 +25,4 @@ if [[ -f "$REMOTE_REPO_DIR/embedding/.env" ]]; then
     set +a
 fi
 
-python "$REMOTE_REPO_DIR/slurmBackend/offline_embedding.py" "$REMOTE_DIR"
+python "$REMOTE_REPO_DIR/backend/slurmBackend/offline_embedding.py" "$REMOTE_DIR"

@@ -27,4 +27,4 @@ if [[ -f "$REMOTE_REPO_DIR/vllm/.env" ]]; then
 fi
 
 export PYTHONPATH="$REMOTE_REPO_DIR/backend${PYTHONPATH:+:$PYTHONPATH}"
-python "$REMOTE_REPO_DIR/slurmBackend/offline_llm.py" "$REMOTE_DIR"
+python "$REMOTE_REPO_DIR/backend/slurmBackend/offline_llm.py" "$REMOTE_DIR"

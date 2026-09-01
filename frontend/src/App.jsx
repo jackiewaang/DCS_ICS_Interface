@@ -26,6 +26,8 @@ export default function App() {
     llm_model: null,
   });
   const [runtimeModelsError, setRuntimeModelsError] = useState("");
+  const [slurmEmbeddingModel, setSlurmEmbeddingModel] = useState("");
+  const [slurmLlmModel, setSlurmLlmModel] = useState("");
   const modelsRequestId = useRef(0);
   const runtimeModelsRequestId = useRef(0);
   const llmRequests = useRef(new Map());
@@ -67,9 +69,15 @@ export default function App() {
       if (!data || typeof data !== "object") throw new Error("Runtime model information is invalid.");
       if (requestId !== runtimeModelsRequestId.current) return;
       setRuntimeModels(data);
+      const embeddingModels = Array.isArray(data.slurm_embedding_models) ? data.slurm_embedding_models : [];
+      const llmModels = Array.isArray(data.slurm_llm_models) ? data.slurm_llm_models : [];
+      setSlurmEmbeddingModel((current) => embeddingModels.includes(current) ? current : embeddingModels[0] || "");
+      setSlurmLlmModel((current) => llmModels.includes(current) ? current : llmModels[0] || "");
     } catch (err) {
       if (requestId !== runtimeModelsRequestId.current) return;
       setRuntimeModels({ embedding_model: null, llm_model: null });
+      setSlurmEmbeddingModel("");
+      setSlurmLlmModel("");
       setRuntimeModelsError(getUserErrorMessage(err, "Runtime model information could not be loaded."));
       console.error("Failed to load runtime model information:", err);
     }
@@ -221,8 +229,38 @@ export default function App() {
             Runtime Models
           </p>
           <div className="mt-4 space-y-3">
-            <RuntimeModelCard icon={Cpu} label="Embedding" value={runtimeModels.embedding_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
-            <RuntimeModelCard icon={Bot} label="LLM" value={runtimeModels.llm_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
+            <RuntimeModelCard icon={Cpu} label="Aquifer embedding" value={runtimeModels.embedding_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
+            <RuntimeModelCard icon={Bot} label="Aquifer LLM" value={runtimeModels.llm_model} error={runtimeModelsError} onRetry={fetchRuntimeModels} />
+            <label className="block rounded-md border border-sidebar-border bg-sidebar-accent p-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+                Slurm embedding
+              </span>
+              <select
+                value={slurmEmbeddingModel}
+                onChange={(event) => setSlurmEmbeddingModel(event.target.value)}
+                disabled={!runtimeModels.slurm_embedding_models?.length}
+                className="mt-2 w-full cursor-pointer rounded-md border border-sidebar-border bg-sidebar px-2.5 py-2 text-xs text-sidebar-foreground outline-none focus:ring-2 focus:ring-sidebar-ring disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {(runtimeModels.slurm_embedding_models || []).map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block rounded-md border border-sidebar-border bg-sidebar-accent p-3">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
+                Slurm LLM
+              </span>
+              <select
+                value={slurmLlmModel}
+                onChange={(event) => setSlurmLlmModel(event.target.value)}
+                disabled={!runtimeModels.slurm_llm_models?.length}
+                className="mt-2 w-full cursor-pointer rounded-md border border-sidebar-border bg-sidebar px-2.5 py-2 text-xs text-sidebar-foreground outline-none focus:ring-2 focus:ring-sidebar-ring disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {(runtimeModels.slurm_llm_models || []).map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+            </label>
             <label className="block rounded-md border border-sidebar-border bg-sidebar-accent p-3">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/70">
                 Inference engine
@@ -263,6 +301,8 @@ export default function App() {
               ? "No inference models are currently registered."
               : "")}
             onRetryModels={fetchModels}
+            embeddingModelName={slurmEmbeddingModel}
+            llmModelName={slurmLlmModel}
           />
         )}
         {currentView === "models" && (
