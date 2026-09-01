@@ -30,5 +30,5 @@ class SlurmConfig:
             ),
             poll_interval=float(os.getenv("SLURM_POLL_INTERVAL", "2")),
             allocation_timeout=float(os.getenv("SLURM_ALLOCATION_TIMEOUT", "30")),
-            completion_timeout=float(os.getenv("SLURM_COMPLETION_TIMEOUT", "300")),
+            completion_timeout=float(os.getenv("SLURM_COMPLETION_TIMEOUT", "600")),
         )

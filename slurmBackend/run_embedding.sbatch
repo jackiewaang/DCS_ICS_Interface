@@ -17,7 +17,10 @@ REMOTE_REPO_DIR="$2"
 
 source "$REMOTE_REPO_DIR/embedding/venv-embedding/bin/activate"
 
-# test_job.py must read "$REMOTE_DIR/input.json" and write
-# "$REMOTE_DIR/output.json" before exiting successfully.
-TEST_JOB_SCRIPT="${TEST_JOB_SCRIPT:-$REMOTE_REPO_DIR/slurmBackend/test_job.py}"
-python "$TEST_JOB_SCRIPT" "$REMOTE_DIR" embedding
+if [[ -f "$REMOTE_REPO_DIR/embedding/.env" ]]; then
+    set -a
+    source "$REMOTE_REPO_DIR/embedding/.env"
+    set +a
+fi
+
+python "$REMOTE_REPO_DIR/slurmBackend/offline_embedding.py" "$REMOTE_DIR"

@@ -9,9 +9,8 @@ from .config import SlurmConfig
 
 @dataclass
 class EmbeddingJobRequest:
-    summary: str
-    research: str
-    details: str
+    texts: list[str]
+    model_name: str
     prompt: str | None = None
 
 class SlurmAllocationTimeout(Exception):
@@ -29,9 +28,8 @@ class SlurmBackend:
     # Wrapper on submit_job to run embedding jobs
     def run_embedding(self, request: EmbeddingJobRequest):
         payload = {
-            "summary": request.summary,
-            "research": request.research,
-            "details": request.details,
+            "texts": request.texts,
+            "model_name": request.model_name,
             "prompt": request.prompt
         }
 
@@ -41,10 +39,10 @@ class SlurmBackend:
         )
 
     # Wrapper on submit_job to run LLM jobs
-    def run_llm(self, payload: dict):
+    def run_llm(self, payload: dict, model_name: str):
         return self._run_job(
             script=self.config.llm_script,
-            payload=payload,
+            payload={**payload, "model_name": model_name},
         )
 
     # Main function running full lifecycle of a job

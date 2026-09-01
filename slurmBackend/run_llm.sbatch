@@ -17,7 +17,11 @@ REMOTE_REPO_DIR="$2"
 
 source "$REMOTE_REPO_DIR/vllm/venv-vllm/bin/activate"
 
-# test_job.py must read "$REMOTE_DIR/input.json" and write
-# "$REMOTE_DIR/output.json" before exiting successfully.
-TEST_JOB_SCRIPT="${TEST_JOB_SCRIPT:-$REMOTE_REPO_DIR/slurmBackend/test_job.py}"
-python "$TEST_JOB_SCRIPT" "$REMOTE_DIR" llm
+if [[ -f "$REMOTE_REPO_DIR/vllm/.env" ]]; then
+    set -a
+    source "$REMOTE_REPO_DIR/vllm/.env"
+    set +a
+fi
+
+export PYTHONPATH="$REMOTE_REPO_DIR/backend${PYTHONPATH:+:$PYTHONPATH}"
+python "$REMOTE_REPO_DIR/slurmBackend/offline_llm.py" "$REMOTE_DIR"
