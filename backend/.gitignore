@@ -2,3 +2,4 @@ database.db
 embeddings
 logs
 venv-backend
+slurmBackend/jobs
