@@ -6,5 +6,5 @@ SLURM_EMBEDDING_MODELS = [
 ]
 
 SLURM_LLM_MODELS = [
-    "Qwen/Qwen3-4B-Instruct-2507",
+    "Qwen/Qwen3-4B-Instruct-2507", "Qwen/Qwen3-8B"
 ]
