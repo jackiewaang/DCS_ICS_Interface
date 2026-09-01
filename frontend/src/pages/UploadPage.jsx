@@ -59,6 +59,8 @@ export default function UploadPage({
   onClearAnalysis,
   modelsError,
   onRetryModels,
+  embeddingModelName,
+  llmModelName,
 }) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -146,6 +148,9 @@ export default function UploadPage({
       const result = await api.runInference(draft.sections, activeConfigId, {
         title: draft.title,
         sections: draft.sections,
+      }, {
+        embeddingModelName,
+        llmModelName,
       });
       const inferenceTimeMs = Math.round(performance.now() - startedAt);
       onAnalysisComplete?.({

@@ -22,6 +22,7 @@ from app.models.inference import (
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
 from app.retention import user_analysis_expiry
+from slurmBackend.models import SLURM_EMBEDDING_MODELS, SLURM_LLM_MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ class LLMInput(BaseModel):
     top_features: list[dict] = Field(default_factory=list)
     summary: str = ""
     details: str = ""
+    model_name: str | None = None
 
 
 @router.get("/runtime-models")
@@ -78,6 +80,8 @@ def get_runtime_models():
         "embedding_source": embedding_source,
         "llm_model": llm_model,
         "llm_source": llm_source,
+        "slurm_embedding_models": SLURM_EMBEDDING_MODELS,
+        "slurm_llm_models": SLURM_LLM_MODELS,
     }
 
 
@@ -140,19 +144,26 @@ def _get_llm_endpoint_model() -> str | None:
 async def run_inference(
     config_id: int,
     sections: InferenceSections,
+    embedding_model_name: str | None = None,
+    llm_model_name: str | None = None,
     user_id: UUID = Header(alias="X-User-ID"),
 ):
+    embedding_model_name = _select_slurm_model(
+        embedding_model_name, SLURM_EMBEDDING_MODELS, "embedding"
+    )
+    llm_model_name = _select_slurm_model(llm_model_name, SLURM_LLM_MODELS, "LLM")
     section_payload = sections.model_dump()
     output = pipeline_manager.run_inference(
         section_payload,
         config_id=config_id,
+        embedding_model_name=embedding_model_name,
     )
     output["global_importance"] = get_global_importance(
         config_id=config_id,
         feature_names=output.get("feature_names", []),
     )
     _log_inference(user_id, config_id, sections, output["score"])
-    output["llm_input"] = _build_llm_input(sections, output)
+    output["llm_input"] = _build_llm_input(sections, output, llm_model_name)
 
     return output
 
@@ -168,8 +179,14 @@ async def run_llm_feedback(
             detail="Run MIL inference before requesting LLM feedback.",
         )
 
+    model_name = _select_slurm_model(
+        llm_input.model_name, SLURM_LLM_MODELS, "LLM"
+    )
+    payload = llm_input.model_dump()
+    payload["model_name"] = model_name
+
     try:
-        return await generate_feedback(llm_input.model_dump())
+        return await generate_feedback(payload)
     except Exception as exc:
         logger.exception("LLM feedback generation failed")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -197,7 +214,11 @@ def _log_inference(
         log_file.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def _build_llm_input(sections: InferenceSections, output: dict) -> dict:
+def _build_llm_input(
+    sections: InferenceSections,
+    output: dict,
+    llm_model_name: str,
+) -> dict:
     top_sentences = sorted(
         (
             {"sentence_text": sentence, "weight": weight}
@@ -235,7 +256,31 @@ def _build_llm_input(sections: InferenceSections, output: dict) -> dict:
         "top_features": top_features,
         "summary": sections.summary,
         "details": sections.impact,
+        "model_name": llm_model_name,
     }
+
+
+def _validate_slurm_model(model_name: str, allowed_models: list[str], kind: str) -> None:
+    if model_name not in allowed_models:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported Slurm {kind} model: {model_name}",
+        )
+
+
+def _select_slurm_model(
+    requested_model: str | None,
+    allowed_models: list[str],
+    kind: str,
+) -> str:
+    if not allowed_models:
+        raise HTTPException(
+            status_code=503,
+            detail=f"No Slurm {kind} models are configured.",
+        )
+    model_name = requested_model or allowed_models[0]
+    _validate_slurm_model(model_name, allowed_models, kind)
+    return model_name
 
 
 def _save_inference_output(

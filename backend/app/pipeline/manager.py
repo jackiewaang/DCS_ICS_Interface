@@ -3,6 +3,7 @@ import time
 from typing import Any
 
 from app.clients.embedding_client import EmbeddingClient
+from app.clients.hybrid_embedding_client import HybridEmbeddingClient
 from app.models.inference import ModelConfig
 from app.pipeline.embedding_preprocessor import EmbeddingPreprocessor
 from app.pipeline.embedding_saver import EmbeddingSaver
@@ -31,10 +32,13 @@ class PipelineManager:
         model_config_resolver: ModelConfigResolver | None = None,
         feature_vector_builder: FeatureVectorBuilder | None = None,
         embedding_saver: EmbeddingSaver | None = None,
+        hybrid_embedding_client: HybridEmbeddingClient | None = None,
     ):
         self.model_runner = model_runner or ModelRunner()
         self.embedding_preprocessor = embedding_preprocessor or EmbeddingPreprocessor()
-        self.embedding_client = embedding_client or EmbeddingClient(EMBEDDING_SERVER_URL)
+        self.embedding_client = hybrid_embedding_client or HybridEmbeddingClient(
+            aquifer_client=embedding_client or EmbeddingClient(EMBEDDING_SERVER_URL)
+        )
         self.model_config_resolver = model_config_resolver or ModelConfigResolver()
         self.feature_vector_builder = feature_vector_builder or FeatureVectorBuilder()
         self.embedding_saver = embedding_saver or EmbeddingSaver()
@@ -44,12 +48,18 @@ class PipelineManager:
         sections: dict[str, str],
         config_id: int | str | None = None,
         config: dict[str, Any] | ModelConfig | None = None,
+        embedding_model_name: str | None = None,
     ) -> dict[str, Any]:
         started_at = time.monotonic()
         logger.info("Inference pipeline started: config_id=%s", config_id)
 
         try:
-            result = self._run_inference(sections, config_id, config)
+            result = self._run_inference(
+                sections,
+                config_id,
+                config,
+                embedding_model_name,
+            )
         except Exception:
             logger.exception("Inference pipeline failed: config_id=%s", config_id)
             raise
@@ -67,6 +77,7 @@ class PipelineManager:
         sections: dict[str, str],
         config_id: int | str | None,
         config: dict[str, Any] | ModelConfig | None,
+        embedding_model_name: str | None,
     ) -> dict[str, Any]:
         model_config = self.model_config_resolver.normalise(
             config or get_model_config(config_id)
@@ -104,6 +115,7 @@ class PipelineManager:
         embeddings = self.embedding_client.embed(
             texts=sentences,
             prompt=CLASSIFICATION_PROMPT,
+            model_name=embedding_model_name,
         )
         if not embeddings:
             raise ValueError("The embedding server returned no embeddings.")

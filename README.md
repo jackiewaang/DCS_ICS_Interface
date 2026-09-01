@@ -4,7 +4,7 @@ React/Vite frontend and FastAPI backend for uploading REF impact case studies, r
 
 ## Project Structure
 
-- `backend/` - FastAPI API server, SQLite database, model assets, inference pipeline, and Python dependencies.
+- `backend/` - FastAPI API server, SQLite database, model assets, inference pipeline, Slurm client/workers, and Python dependencies.
 - `frontend/` - React development frontend built with Vite.
 - `vllm/` - helper script for starting the local OpenAI-compatible vLLM server used by the LLM review feature.
 
@@ -130,6 +130,28 @@ cd vllm
 ```
 
 The core upload and model inference flow can run without vLLM, but LLM review generation requires the vLLM server.
+
+## Slurm-first inference with Aquifer fallback
+
+Embedding generation and LLM feedback now submit GPU jobs through
+`backend/slurmBackend` first. If submission, allocation, execution, result parsing,
+or either configured Slurm timeout fails, the backend logs the failure and retries
+the same operation through the existing local services (Aquifer):
+
+- Embeddings: `http://localhost:8001/embed`
+- LLM feedback: the OpenAI-compatible endpoint configured by `VLLM_BASE_URL`
+
+Configure the Slurm connection in `backend/.env`. The remote repository must use
+the same layout, including these relocated script paths:
+
+```text
+DCS_ICS_Interface/backend/slurmBackend/run_embedding.sbatch
+DCS_ICS_Interface/backend/slurmBackend/run_llm.sbatch
+```
+
+The user-selectable remote model allowlists are defined in
+`backend/slurmBackend/models.py`. Aquifer fallback keeps its existing fixed
+embedding and LLM models.
 
 ## Database Initialisation
 

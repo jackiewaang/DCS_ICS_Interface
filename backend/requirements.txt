@@ -14,6 +14,7 @@ curated-tokenizers==0.0.10
 curated-transformers==0.1.1
 cymem==2.0.13
 defusedxml==0.7.1
+dotenv==0.9.9
 en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 en_core_web_trf @ https://github.com/explosion/spacy-models/releases/download/en_core_web_trf-3.8.0/en_core_web_trf-3.8.0-py3-none-any.whl#sha256=272a31e9d8530d1e075351d30a462d7e80e31da23574f1b274e200f3fff35bf5
 fastapi==0.141.1
@@ -51,6 +52,7 @@ Pygments==2.21.0
 pypdfium2==5.13.0
 pyphen==0.18.1
 python-dateutil==2.9.0.post0
+python-dotenv==1.2.3
 python-multipart==0.0.32
 regex==2026.7.19
 requests==2.34.2
