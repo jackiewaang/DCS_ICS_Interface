@@ -9,6 +9,7 @@ anyio==4.14.2
 apache-tvm-ffi==0.1.10
 astor==0.8.1
 attrs==26.1.0
+bitsandbytes==0.50.2
 blake3==1.0.9
 cachetools==7.1.7
 cbor2==6.1.4
