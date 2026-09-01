@@ -1,5 +1,10 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+SLURM_ENV_PATH = Path(__file__).resolve().with_name(".env")
 
 @dataclass
 class SlurmConfig:
@@ -15,6 +20,7 @@ class SlurmConfig:
 
     @classmethod
     def from_env(cls):
+        load_dotenv(SLURM_ENV_PATH, override=False)
         return cls(
             ssh_host=os.getenv("SLURM_SSH_HOST", "default_host"),
             proxy_jump=os.getenv("SLURM_PROXY_JUMP", "default_jump"),
