@@ -15,6 +15,9 @@ set -euo pipefail
 REMOTE_DIR="$1"
 REMOTE_REPO_DIR="$2"
 
+source /etc/profile.d/modules.sh
+
+module load CUDA
 source "$REMOTE_REPO_DIR/vllm/venv-vllm/bin/activate"
 
 if [[ -f "$REMOTE_REPO_DIR/vllm/.env" ]]; then

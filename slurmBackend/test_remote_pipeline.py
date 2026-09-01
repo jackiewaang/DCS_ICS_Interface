@@ -3,7 +3,11 @@ import json
 
 from slurmBackend.backend import EmbeddingJobRequest, SlurmBackend
 from slurmBackend.config import SlurmConfig
+from dotenv import load_dotenv
+from pathlib import Path
 
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -11,7 +15,10 @@ def main() -> None:
     parser.add_argument("--llm-model", default="Qwen/Qwen3-4B-Instruct-2507")
     args = parser.parse_args()
 
+    config = SlurmConfig.from_env()
+    print(config)
     backend = SlurmBackend(SlurmConfig.from_env())
+    
 
     embeddings = backend.run_embedding(
         EmbeddingJobRequest(

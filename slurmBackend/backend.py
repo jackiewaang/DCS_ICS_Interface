@@ -81,9 +81,10 @@ class SlurmBackend:
             
             return self._read_result(remote_dir)
         
+        #finally:
+        #   self._cleanup(remote_dir)
         finally:
-            self._cleanup(remote_dir)
-
+            pass
     def _submit_job(self, script: str, remote_dir: str) -> str:
         """
         Submits job to Slurm and returns job ID

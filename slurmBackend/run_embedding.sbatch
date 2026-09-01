@@ -15,6 +15,8 @@ set -euo pipefail
 REMOTE_DIR="$1"
 REMOTE_REPO_DIR="$2"
 
+source /etc/profile.d/modules.sh
+module load CUDA
 source "$REMOTE_REPO_DIR/embedding/venv-embedding/bin/activate"
 
 if [[ -f "$REMOTE_REPO_DIR/embedding/.env" ]]; then
