@@ -1,18 +1,16 @@
 #!/bin/bash
 set -e
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=0 # Use Titan RTX 24GB on Aquifer
 
 REPO_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 APP_DIR="$REPO_ROOT/embedding"
 
-#module load Python/3.11.5-GCCcore-13.2.0 - uncomment to load Python module if not loaded
-#module load CUDA/12.8.0 - uncomment to load CUDA
 source "$APP_DIR/venv-embedding/bin/activate"
 
 set -a
-source "$APP_DIR/.env"
+source "$REPO_ROOT/.env"
 set +a
 
 cd "$REPO_ROOT"
-exec uvicorn embedding.server:app --host "$HOST" --port "$EMBEDDING_SERVER_PORT"
+exec uvicorn embedding.server:app --host "$HOST" --port "$AQUIFER_EMBEDDING_PORT"

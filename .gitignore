@@ -1,5 +1,19 @@
 all-roberta-large-v1-*
 
+backend/database.db
+backend/embeddings
+backend/logs
+backend/venv-backend
+backend/slurmBackend/jobs
+backend/assets/REF2014
+backend/assets/REF2021
+
+# Aquifer
+embedding/venv-embedding
+vllm/venv-vllm
+
+
+
 feedback.csv
 # Byte-compiled / optimized / DLL files
 __pycache__/

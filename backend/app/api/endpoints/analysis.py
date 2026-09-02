@@ -30,13 +30,18 @@ router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
 REPO_ROOT = Path(__file__).resolve().parents[4]
 LOGS_DIR = REPO_ROOT / "logs-users"
-EMBEDDING_ENV_PATH = REPO_ROOT / "embedding" / ".env"
-VLLM_ENV_PATH = REPO_ROOT / "vllm" / ".env"
+ENV_PATH = REPO_ROOT / ".env"
+
 EMBEDDING_HEALTH_URL = os.getenv(
-    "EMBEDDING_HEALTH_URL",
+    "AQUIFER_EMBEDDING_HEALTH",
     "http://localhost:8001/health",
 )
-VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8002/v1").rstrip("/")
+
+VLLM_BASE_URL = os.getenv(
+    "VLLM_BASE_URL",
+    "http://localhost:8002/v1"
+).rstrip("/")
+
 RUNTIME_MODEL_LOOKUP_TIMEOUT = 2
 
 
@@ -61,8 +66,8 @@ class LLMInput(BaseModel):
 
 @router.get("/runtime-models")
 def get_runtime_models():
-    embedding_model = _read_env_value(EMBEDDING_ENV_PATH, "EMBEDDING_MODEL")
-    llm_model = _read_env_value(VLLM_ENV_PATH, "LLM_MODEL_NAME")
+    embedding_model = _read_env_value(ENV_PATH, "AQUIFER_EMBEDDING_MODEL")
+    llm_model = _read_env_value(ENV_PATH, "AQUIFER_LLM_MODEL")
 
     embedding_source = "environment"
     llm_source = "environment"

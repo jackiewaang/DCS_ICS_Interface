@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-SLURM_ENV_PATH = Path(__file__).resolve().with_name(".env")
+SLURM_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 
 @dataclass
 class SlurmConfig:

@@ -1,5 +1,4 @@
 import logging
-import os
 from numbers import Real
 
 from app.clients.embedding_client import EmbeddingClient
@@ -23,12 +22,7 @@ class HybridEmbeddingClient:
     ) -> None:
         self.aquifer_client = aquifer_client
         self.slurm_backend = slurm_backend or SlurmBackend(SlurmConfig.from_env())
-        self.model_name = (
-            model_name
-            or os.getenv("SLURM_EMBEDDING_MODEL")
-            or os.getenv("EMBEDDING_MODEL")
-            or DEFAULT_EMBEDDING_MODEL
-        )
+        self.model_name = model_name or DEFAULT_EMBEDDING_MODEL
 
     def embed(
         self,

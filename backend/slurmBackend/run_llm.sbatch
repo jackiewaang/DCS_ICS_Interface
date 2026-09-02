@@ -16,15 +16,13 @@ REMOTE_DIR="$1"
 REMOTE_REPO_DIR="$2"
 
 source /etc/profile.d/modules.sh
-
 module load CUDA
+
 source "$REMOTE_REPO_DIR/vllm/venv-vllm/bin/activate"
 
-if [[ -f "$REMOTE_REPO_DIR/vllm/.env" ]]; then
-    set -a
-    source "$REMOTE_REPO_DIR/vllm/.env"
-    set +a
-fi
+set -a
+source "$REMOTE_REPO_DIR/.env"
+set +a
 
 export PYTHONPATH="$REMOTE_REPO_DIR/backend${PYTHONPATH:+:$PYTHONPATH}"
 python "$REMOTE_REPO_DIR/backend/slurmBackend/offline_llm.py" "$REMOTE_DIR"

@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import os
 from json import JSONDecodeError
 
 from app.llm.client import generate
@@ -27,8 +26,6 @@ slurm_backend = SlurmBackend(SlurmConfig.from_env())
 async def generate_feedback(llm_input: dict) -> dict:
     model_name = (
         llm_input.get("model_name")
-        or os.getenv("SLURM_LLM_MODEL")
-        or os.getenv("LLM_MODEL_NAME")
         or DEFAULT_LLM_MODEL
     )
 

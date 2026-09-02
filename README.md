@@ -141,7 +141,8 @@ the same operation through the existing local services (Aquifer):
 - Embeddings: `http://localhost:8001/embed`
 - LLM feedback: the OpenAI-compatible endpoint configured by `VLLM_BASE_URL`
 
-Configure the Slurm connection in `backend/.env`. The remote repository must use
+Copy `.env.example` to `.env` in the repository root and configure the Slurm
+connection there. The remote repository must use
 the same layout, including these relocated script paths:
 
 ```text

@@ -48,7 +48,7 @@ def main() -> None:
         model=model_name,
         max_model_len=int(os.getenv("MAX_MODEL_LEN", "8192")),
         gpu_memory_utilization=float(os.getenv("GPU_MEMORY_UTIL", "0.6")),
-        quantization="bitsandbytes",
+        quantization=os.getenv("QUANTIZATION", "bitsandbytes"),
     )
     sampling_params = SamplingParams(
         temperature=0,
