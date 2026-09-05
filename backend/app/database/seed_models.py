@@ -75,6 +75,7 @@ def _build_model_config(config_path: Path) -> dict[str, Any] | None:
 
     return {
         "name": config.get("name") or model_dir.name,
+        "description": config.get("description") or None,
         "emb_model": config.get("emb_model"),
         "run_mode": config.get("run_mode"),
         "fusion_type": config.get("fusion_type") or "gated",

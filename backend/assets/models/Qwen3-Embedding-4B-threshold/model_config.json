@@ -1,4 +1,5 @@
 {
+  "description": "This model distinguishes REF 4* outputs from 3* outputs, focusing on the boundary between very high and high impact.",
   "emb_model": "Qwen-Qwen3-Embedding-4B",
   "emb_mode": "sentence",
   "case_feat_names": [

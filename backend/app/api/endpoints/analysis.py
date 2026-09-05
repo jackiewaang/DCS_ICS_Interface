@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -12,16 +13,22 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.llm.service import generate_feedback
+from app.clients.aquifer_llm_client import AquiferLLMClient
+from app.clients.slurm_client import SlurmClient
 from app.models.model_configs import ModelConfig
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
+from app.services.llm_service import LLMService
 from slurmBackend.models import SLURM_EMBEDDING_MODELS, SLURM_LLM_MODELS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
+llm_service = LLMService(
+    slurm_client=SlurmClient(),
+    aquifer_client=AquiferLLMClient(),
+)
 REPO_ROOT = Path(__file__).resolve().parents[4]
 LOGS_DIR = REPO_ROOT / "logs-users"
 ENV_PATH = REPO_ROOT / ".env"
@@ -152,7 +159,8 @@ async def run_inference(
     )
     llm_model_name = _select_slurm_model(llm_model_name, SLURM_LLM_MODELS, "LLM")
     section_payload = sections.model_dump()
-    output = pipeline_manager.run_inference(
+    output = await asyncio.to_thread(
+        pipeline_manager.run_inference,
         section_payload,
         config_id=config_id,
         embedding_model_name=embedding_model_name,
@@ -185,7 +193,7 @@ async def run_llm_feedback(
     payload["model_name"] = model_name
 
     try:
-        return await generate_feedback(payload)
+        return await llm_service.generate_feedback(payload)
     except Exception as exc:
         logger.exception("LLM feedback generation failed")
         raise HTTPException(status_code=502, detail=str(exc)) from exc

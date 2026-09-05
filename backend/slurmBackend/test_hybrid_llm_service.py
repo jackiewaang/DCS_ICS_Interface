@@ -1,8 +1,7 @@
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
-from app.llm import service
-from slurmBackend.backend import SlurmCompletionTimeout
+from app.services.llm_service import LLMService
 
 
 VALID_FEEDBACK = {
@@ -29,53 +28,43 @@ class FakeSlurmBackend:
         self.error = error
         self.calls = []
 
-    def run_llm(self, payload, model_name):
-        self.calls.append({"payload": payload, "model_name": model_name})
+    def generate(self, messages, model_name):
+        self.calls.append({"messages": messages, "model_name": model_name})
         if self.error:
             raise self.error
         return self.result
 
 
-class HybridLlmServiceTests(unittest.IsolatedAsyncioTestCase):
+class LLMServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_uses_slurm_result_without_calling_aquifer(self):
         slurm = FakeSlurmBackend(result=VALID_FEEDBACK)
         aquifer = AsyncMock()
 
-        with (
-            patch.object(service, "slurm_backend", slurm),
-            patch.object(service, "generate", aquifer),
-        ):
-            result = await service.generate_feedback(LLM_INPUT)
+        result = await LLMService(slurm, aquifer).generate_feedback(LLM_INPUT)
 
         self.assertEqual(result, VALID_FEEDBACK)
-        aquifer.assert_not_awaited()
+        aquifer.generate.assert_not_awaited()
         self.assertEqual(slurm.calls[0]["model_name"], "selected/model")
 
     async def test_falls_back_to_aquifer_on_slurm_timeout(self):
-        slurm = FakeSlurmBackend(error=SlurmCompletionTimeout("timed out"))
-        aquifer = AsyncMock(return_value=_valid_feedback_json())
+        slurm = FakeSlurmBackend(error=TimeoutError("timed out"))
+        aquifer = AsyncMock()
+        aquifer.generate.return_value = _valid_feedback_json()
 
-        with (
-            patch.object(service, "slurm_backend", slurm),
-            patch.object(service, "generate", aquifer),
-        ):
-            result = await service.generate_feedback(LLM_INPUT)
+        result = await LLMService(slurm, aquifer).generate_feedback(LLM_INPUT)
 
         self.assertEqual(result, VALID_FEEDBACK)
-        aquifer.assert_awaited_once()
+        aquifer.generate.assert_awaited_once()
 
     async def test_falls_back_to_aquifer_on_malformed_slurm_result(self):
         slurm = FakeSlurmBackend(result={"unexpected": "value"})
-        aquifer = AsyncMock(return_value=_valid_feedback_json())
+        aquifer = AsyncMock()
+        aquifer.generate.return_value = _valid_feedback_json()
 
-        with (
-            patch.object(service, "slurm_backend", slurm),
-            patch.object(service, "generate", aquifer),
-        ):
-            result = await service.generate_feedback(LLM_INPUT)
+        result = await LLMService(slurm, aquifer).generate_feedback(LLM_INPUT)
 
         self.assertEqual(result, VALID_FEEDBACK)
-        aquifer.assert_awaited_once()
+        aquifer.generate.assert_awaited_once()
 
 
 def _valid_feedback_json():

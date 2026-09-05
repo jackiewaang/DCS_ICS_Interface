@@ -108,6 +108,11 @@ export default function ModelConfigsPage({ models, isLoading, error, onRetry }) 
                     <h2 className="mt-1 text-lg font-semibold text-foreground">
                       {model.name || "Unnamed model"}
                     </h2>
+                    {model.description && (
+                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                        {model.description}
+                      </p>
+                    )}
                   </div>
                   <span className="rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground">
                     {model.run_mode || "Unspecified"}
@@ -116,7 +121,7 @@ export default function ModelConfigsPage({ models, isLoading, error, onRetry }) 
               </div>
 
               <dl className="divide-y divide-border">
-                {Object.entries(model).map(([key, value]) => (
+                {Object.entries(model).filter(([key]) => key !== "description").map(([key, value]) => (
                   <div key={key} className="grid gap-2 px-5 py-3 sm:grid-cols-[11rem_minmax(0,1fr)]">
                     <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {fieldLabel(key)}

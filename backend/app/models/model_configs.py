@@ -9,6 +9,7 @@ class ModelConfig(Base):
 
     config_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Model Architecture
     emb_model: Mapped[str] = mapped_column(String, nullable=False)  # e.g. Qwen3-Embedding-4B

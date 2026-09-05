@@ -1,3 +1,4 @@
+# only used for constructing LLM prompt
 SYSTEM_PROMPT = """
 You are an expert reviewer of UK REF Impact Case Studies.
 

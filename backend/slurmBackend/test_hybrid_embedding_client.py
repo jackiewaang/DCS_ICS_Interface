@@ -1,7 +1,6 @@
 import unittest
 
-from app.clients.hybrid_embedding_client import HybridEmbeddingClient
-from slurmBackend.backend import SlurmCompletionTimeout
+from app.services.embedding_service import EmbeddingService
 
 
 class FakeAquiferClient:
@@ -20,18 +19,18 @@ class FakeSlurmBackend:
         self.error = error
         self.requests = []
 
-    def run_embedding(self, request):
+    def embed(self, **request):
         self.requests.append(request)
         if self.error:
             raise self.error
         return self.result
 
 
-class HybridEmbeddingClientTests(unittest.TestCase):
+class EmbeddingServiceTests(unittest.TestCase):
     def test_uses_slurm_result_without_calling_aquifer(self):
         aquifer = FakeAquiferClient()
         slurm = FakeSlurmBackend(result={"embeddings": [[1.0, 2.0]]})
-        client = HybridEmbeddingClient(aquifer, slurm, model_name="test/model")
+        client = EmbeddingService(slurm, aquifer)
 
         result = client.embed(
             ["text"],
@@ -41,12 +40,12 @@ class HybridEmbeddingClientTests(unittest.TestCase):
 
         self.assertEqual(result, [[1.0, 2.0]])
         self.assertEqual(aquifer.calls, [])
-        self.assertEqual(slurm.requests[0].model_name, "selected/model")
+        self.assertEqual(slurm.requests[0]["model_name"], "selected/model")
 
     def test_falls_back_to_aquifer_on_slurm_timeout(self):
         aquifer = FakeAquiferClient()
-        slurm = FakeSlurmBackend(error=SlurmCompletionTimeout("timed out"))
-        client = HybridEmbeddingClient(aquifer, slurm, model_name="test/model")
+        slurm = FakeSlurmBackend(error=TimeoutError("timed out"))
+        client = EmbeddingService(slurm, aquifer)
 
         result = client.embed(["text"], prompt="prompt")
 
@@ -56,7 +55,7 @@ class HybridEmbeddingClientTests(unittest.TestCase):
     def test_falls_back_to_aquifer_on_malformed_slurm_result(self):
         aquifer = FakeAquiferClient()
         slurm = FakeSlurmBackend(result={"embeddings": []})
-        client = HybridEmbeddingClient(aquifer, slurm, model_name="test/model")
+        client = EmbeddingService(slurm, aquifer)
 
         result = client.embed(["text"])
 

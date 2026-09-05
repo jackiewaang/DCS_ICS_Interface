@@ -31,14 +31,16 @@ def main() -> None:
     if not isinstance(payload, dict):
         raise ValueError("input.json must contain a JSON object.")
 
-    messages = build_prompt(
-        prediction=payload["prediction_label"],
-        probability=payload.get("score") or 0,
-        top_sentences=payload.get("top_sentences", []),
-        feature_importances=payload.get("top_features", []),
-        summary=payload.get("summary", ""),
-        details=payload.get("details", ""),
-    )
+    messages = payload.get("messages")
+    if not isinstance(messages, list) or not messages:
+        messages = build_prompt(
+            prediction=payload["prediction_label"],
+            probability=payload.get("score") or 0,
+            top_sentences=payload.get("top_sentences", []),
+            feature_importances=payload.get("top_features", []),
+            summary=payload.get("summary", ""),
+            details=payload.get("details", ""),
+        )
 
     model_name = payload.get("model_name")
     if not isinstance(model_name, str) or not model_name.strip():
