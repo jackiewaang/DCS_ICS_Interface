@@ -13,15 +13,9 @@ from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.llm.service import generate_feedback
-from app.models.document import DocumentFeatures, DocumentMetadata
-from app.models.inference import (
-    Attention,
-    Inference,
-    ModelConfig,
-)
+from app.models.model_configs import ModelConfig
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
-from app.retention import user_analysis_expiry
 from slurmBackend.models import SLURM_EMBEDDING_MODELS, SLURM_LLM_MODELS
 
 logger = logging.getLogger(__name__)
@@ -286,80 +280,3 @@ def _select_slurm_model(
     model_name = requested_model or allowed_models[0]
     _validate_slurm_model(model_name, allowed_models, kind)
     return model_name
-
-
-def _save_inference_output(
-    config_id: int,
-    sections: InferenceSections,
-    output: dict,
-) -> dict:
-    title = _normalise_title(sections.title)
-    features = output.get("features") or {}
-    entities = output.get("entities") or {}
-    sentences = output.get("sentences") or []
-    attention = output.get("attention") or []
-    feature_names = output.get("feature_names") or []
-    feature_gates = output.get("feature_gates") or []
-    feature_attributions = {
-        name: value
-        for name, value in zip(feature_names, feature_gates)
-    }
-
-    with SessionLocal() as db:
-        document = DocumentMetadata(
-            title=title,
-            institution=sections.institution,
-            uoa=sections.uoa,
-            raw_text="\n\n".join(
-                section
-                for section in (sections.summary, sections.research, sections.impact)
-                if section
-            ),
-            summary_text=sections.summary,
-            research_text=sections.research,
-            impact_text=sections.impact,
-            expires_at=user_analysis_expiry(),
-            features=DocumentFeatures(
-                features_json=json.dumps(features),
-                entities_json=json.dumps(entities),
-            ),
-        )
-        db.add(document)
-        db.flush()
-
-        inference = Inference(
-            document_id=document.document_id,
-            config_id=config_id,
-            score=output.get("score"),
-            true_label=None,
-            prediction_label=output.get("label"),
-            narrative_contribution=output.get("narrative_contribution"),
-            feature_contribution=output.get("feature_contribution"),
-            feature_attributions=json.dumps(feature_attributions),
-        )
-        db.add(inference)
-        db.flush()
-
-        db.add_all(
-            [
-                Attention(
-                    inference_id=inference.inference_id,
-                    sentence_text=sentence,
-                    weight=weight,
-                )
-                for sentence, weight in zip(sentences, attention)
-            ]
-        )
-
-        db.commit()
-        return {
-            "document_id": document.document_id,
-            "inference_id": inference.inference_id,
-            "title": title,
-            "created_at": inference.created_at.isoformat() if inference.created_at else None,
-        }
-
-
-def _normalise_title(value: str | None) -> str:
-    title = (value or "").strip()
-    return title or "Untitled inference"

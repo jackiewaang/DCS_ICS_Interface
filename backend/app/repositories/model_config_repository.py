@@ -1,9 +1,7 @@
 # Provides database access for model configurations and global feature importance.
 
-from sqlalchemy import select
-
 from app.database import SessionLocal
-from app.models.inference import ModelConfig, ModelFeatureImportance
+from app.models.model_configs import ModelConfig
 
 
 def get_model_config(config_id: int | str | None) -> ModelConfig:
@@ -27,15 +25,8 @@ def get_global_importance(
         return {}
 
     with SessionLocal() as db:
-        rows = db.scalars(
-            select(ModelFeatureImportance).where(
-                ModelFeatureImportance.config_id == numeric_config_id
-            )
-        ).all()
+        config = db.get(ModelConfig, numeric_config_id)
+        if config and config.feature_importances:
+            return dict(config.feature_importances)
 
-    if rows:
-        return {
-            row.feature_name: row.mean_permutation_importance
-            for row in rows
-        }
     return {feature_name: 0.0 for feature_name in feature_names or []}

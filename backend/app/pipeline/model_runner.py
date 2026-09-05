@@ -11,6 +11,7 @@ from app.pipeline.attention_mil import AttentionMIL
 
 
 logger = logging.getLogger(__name__)
+CLASSIFICATION_THRESHOLD = 0.5
 
 
 class ModelRunner:
@@ -55,11 +56,9 @@ class ModelRunner:
             ) = model(embedding_tensor, case_features=feature_tensor)
 
         score = float(prediction.item())
-        classification_threshold = float(config.get("classif_thresh", 0.5))
-
         return {
             "score": score,
-            "label": "High Impact" if score > classification_threshold else "Low Impact",
+            "label": "High Impact" if score > CLASSIFICATION_THRESHOLD else "Low Impact",
             "attention": attention.detach().view(-1).cpu().numpy().tolist(),
             "feature_gates": (
                 gates.detach().view(-1).cpu().numpy().tolist()

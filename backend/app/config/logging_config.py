@@ -3,9 +3,8 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 
-LOG_DIR = Path(__file__).resolve().parents[1] / "logs"
+LOG_DIR = Path(__file__).resolve().parents[2] / "logs"
 LOG_FILE = LOG_DIR / "backend.log"
-
 
 def configure_logging() -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)

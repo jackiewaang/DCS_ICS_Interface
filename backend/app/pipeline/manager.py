@@ -4,7 +4,7 @@ from typing import Any
 
 from app.clients.embedding_client import EmbeddingClient
 from app.clients.hybrid_embedding_client import HybridEmbeddingClient
-from app.models.inference import ModelConfig
+from app.models.model_configs import ModelConfig
 from app.pipeline.embedding_preprocessor import EmbeddingPreprocessor
 from app.pipeline.embedding_saver import EmbeddingSaver
 from app.pipeline.feature_vector_builder import FeatureVectorBuilder

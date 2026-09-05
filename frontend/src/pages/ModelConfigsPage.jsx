@@ -7,10 +7,8 @@ const FIELD_LABELS = {
   emb_model: "Embedding model",
   run_mode: "Run mode",
   fusion_type: "Fusion type",
-  normalise_emb: "Normalize embeddings",
-  normalise_case_feats: "Normalize case features",
   case_feat_names: "Case features",
-  label_config: "Label configuration",
+  feature_importances: "Feature importances",
   model_path: "Model artifact",
   scaler_path: "Scaler artifact",
 };
