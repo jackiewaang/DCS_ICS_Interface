@@ -9,7 +9,7 @@ import UploadPage from "./pages/UploadPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
-const LLM_TIMEOUT_MS = 305_000;
+const LLM_TIMEOUT_MS = 700_000;
 
 export default function App() {
   const [currentView, setCurrentView] = useState("upload");

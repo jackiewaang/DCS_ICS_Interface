@@ -1,4 +1,5 @@
 import logging
+import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -12,20 +13,26 @@ def configure_logging() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
 
-    if any(
+    has_file_handler = any(
         isinstance(handler, TimedRotatingFileHandler)
         and Path(handler.baseFilename) == LOG_FILE
         for handler in root_logger.handlers
-    ):
-        return
-
-    handler = TimedRotatingFileHandler(
-        LOG_FILE,
-        when="midnight",
-        backupCount=14,
-        encoding="utf-8",
     )
-    handler.setFormatter(logging.Formatter(
+    formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-    ))
-    root_logger.addHandler(handler)
+    )
+
+    if not has_file_handler:
+        file_handler = TimedRotatingFileHandler(
+            LOG_FILE,
+            when="midnight",
+            backupCount=14,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+
+    if not any(type(handler) is logging.StreamHandler for handler in root_logger.handlers):
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        root_logger.addHandler(console_handler)

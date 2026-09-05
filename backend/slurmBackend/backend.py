@@ -1,4 +1,5 @@
 import json
+import logging
 import shlex
 import subprocess
 import time
@@ -6,6 +7,8 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from .config import SlurmConfig
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class EmbeddingJobRequest:
@@ -50,18 +53,38 @@ class SlurmBackend:
 
         request_id = str(uuid4())
         remote_dir = f"{self.config.remote_job_dir.rstrip('/')}/{request_id}"
+        started_at = time.monotonic()
+        logger.info(
+            "Slurm request started request_id=%s script=%s payload_keys=%s",
+            request_id,
+            script,
+            sorted(payload.keys()),
+        )
 
         try:
             self._write_input(remote_dir, payload)
+            logger.info("Slurm input written request_id=%s", request_id)
 
             job_id = self._submit_job(
                 script=script,
                 remote_dir=remote_dir
             )
+            logger.info(
+                "Slurm job submitted request_id=%s job_id=%s elapsed_seconds=%.2f",
+                request_id,
+                job_id,
+                time.monotonic() - started_at,
+            )
 
             allocated = self._wait_for_allocation(job_id)
 
             if not allocated:
+                logger.warning(
+                    "Slurm allocation failed request_id=%s job_id=%s elapsed_seconds=%.2f",
+                    request_id,
+                    job_id,
+                    time.monotonic() - started_at,
+                )
                 self._cancel_job(job_id)
                 raise SlurmAllocationTimeout(
                     f"Job {job_id} was not allocated within the "
@@ -71,15 +94,36 @@ class SlurmBackend:
             try:
                 final_state = self._wait_for_completion(job_id)
             except SlurmCompletionTimeout:
+                logger.warning(
+                    "Slurm completion timed out request_id=%s job_id=%s elapsed_seconds=%.2f",
+                    request_id,
+                    job_id,
+                    time.monotonic() - started_at,
+                )
                 self._cancel_job(job_id)
                 raise
 
+            logger.info(
+                "Slurm job reached terminal state request_id=%s job_id=%s state=%s elapsed_seconds=%.2f",
+                request_id,
+                job_id,
+                final_state,
+                time.monotonic() - started_at,
+            )
             if final_state != "COMPLETED":
                 raise RuntimeError(
                     f"Slurm job {job_id} failed with state: {final_state}"
                 )
             
-            return self._read_result(remote_dir)
+            result = self._read_result(remote_dir)
+            logger.info(
+                "Slurm result read request_id=%s job_id=%s elapsed_seconds=%.2f result_type=%s",
+                request_id,
+                job_id,
+                time.monotonic() - started_at,
+                type(result).__name__,
+            )
+            return result
         
         #finally:
         #   self._cleanup(remote_dir)
@@ -126,8 +170,12 @@ class SlurmBackend:
         
         deadline = time.monotonic() + self.config.allocation_timeout
 
+        previous_state = None
         while time.monotonic() < deadline:
             state = self._get_job_state(job_id)
+            if state != previous_state:
+                logger.info("Slurm allocation state job_id=%s state=%s", job_id, state)
+                previous_state = state
 
             if state in {"RUNNING", "COMPLETING", "COMPLETED"}:
                 return True
@@ -162,8 +210,12 @@ class SlurmBackend:
 
         deadline = time.monotonic() + self.config.completion_timeout
 
+        previous_state = None
         while time.monotonic() < deadline:
             state = self._get_job_state(job_id)
+            if state != previous_state:
+                logger.info("Slurm completion state job_id=%s state=%s", job_id, state)
+                previous_state = state
 
             if state in {
                 "COMPLETED",

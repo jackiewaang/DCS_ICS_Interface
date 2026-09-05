@@ -2,9 +2,10 @@ import asyncio
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import requests
 from dotenv import dotenv_values
@@ -180,7 +181,20 @@ async def run_llm_feedback(
     llm_input: LLMInput,
     user_id: UUID = Header(alias="X-User-ID"),
 ):
+    request_id = str(uuid4())
+    started_at = time.monotonic()
+    logger.info(
+        "LLM feedback request started request_id=%s user_id=%s requested_model=%s",
+        request_id,
+        user_id,
+        llm_input.model_name,
+    )
+
     if not (LOGS_DIR / str(user_id)).is_dir():
+        logger.warning(
+            "LLM feedback request rejected request_id=%s reason=missing_inference_log",
+            request_id,
+        )
         raise HTTPException(
             status_code=403,
             detail="Run MIL inference before requesting LLM feedback.",
@@ -193,9 +207,22 @@ async def run_llm_feedback(
     payload["model_name"] = model_name
 
     try:
-        return await llm_service.generate_feedback(payload)
+        result = await llm_service.generate_feedback(payload, request_id=request_id)
+        logger.info(
+            "LLM feedback request completed request_id=%s model=%s elapsed_seconds=%.2f",
+            request_id,
+            model_name,
+            time.monotonic() - started_at,
+        )
+        return result
     except Exception as exc:
-        logger.exception("LLM feedback generation failed")
+        logger.exception(
+            "LLM feedback request failed request_id=%s model=%s elapsed_seconds=%.2f error_type=%s",
+            request_id,
+            model_name,
+            time.monotonic() - started_at,
+            type(exc).__name__,
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
