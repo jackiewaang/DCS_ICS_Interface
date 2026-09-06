@@ -48,6 +48,12 @@ class SlurmBackend:
             payload={**payload, "model_name": model_name},
         )
 
+    def run_gemma(self, payload: dict):
+        return self._run_job(
+            script=self.config.gemma_script,
+            payload=payload,
+        )
+
     # Main function running full lifecycle of a job
     def _run_job(self, script: str, payload: dict):
 

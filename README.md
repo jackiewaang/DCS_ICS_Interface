@@ -148,7 +148,14 @@ the same layout, including these relocated script paths:
 ```text
 DCS_ICS_Interface/backend/slurmBackend/run_embedding.sbatch
 DCS_ICS_Interface/backend/slurmBackend/run_llm.sbatch
+DCS_ICS_Interface/backend/slurmBackend/run_gemma.sbatch
 ```
+
+Set `SLURM_GEMMA_SCRIPT` to the remote path of `run_gemma.sbatch`. The Gemma
+assessment endpoint loads the fine-tuned adapter from
+`backend/assets/models/Gemma-3-12B-finetuned/` in the remote repository and
+writes its request log to `logs-users/<user-id>/gemma_inferences.jsonl`; it does
+not save Gemma inferences to the application database.
 
 The user-selectable remote model allowlists are defined in
 `backend/slurmBackend/models.py`. Aquifer fallback keeps its existing fixed

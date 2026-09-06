@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./services/api";
-import { Bot, Cpu, Database, History as HistoryIcon, Upload, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
+import { Bot, Cpu, Database, History as HistoryIcon, Upload, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare, Sparkles } from "lucide-react";
 import FeedbackPage from "./pages/FeedbackPage";
 import RuntimeModelCard from "./components/RuntimeModelCard";
 import InferenceHistoryPage from "./pages/InferenceHistoryPage";
 import ModelConfigsPage from "./pages/ModelConfigsPage";
 import UploadPage from "./pages/UploadPage";
+import GemmaPage from "./pages/GemmaPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
@@ -18,6 +19,7 @@ export default function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [uploadInferenceResult, setUploadInferenceResult] = useState(null);
   const [isInferenceProcessing, setIsInferenceProcessing] = useState(false);
+  const [isGemmaProcessing, setIsGemmaProcessing] = useState(false);
   const [models, setModels] = useState([]);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
@@ -178,7 +180,7 @@ export default function App() {
   const isLlmProcessing = inferenceHistory.some(
     (result) => result.llm_feedback?.status === "running",
   );
-  const isProcessing = isInferenceProcessing || isLlmProcessing;
+  const isProcessing = isInferenceProcessing || isGemmaProcessing || isLlmProcessing;
 
   return (
     <fieldset
@@ -209,6 +211,13 @@ export default function App() {
             label="Upload New Case"
             isActive={currentView === "upload"}
             onClick={() => setCurrentView("upload")}
+            isCollapsed={isCollapsed}
+          />
+          <NavItem
+            icon={<Sparkles className="h-4 w-4 shrink-0" />}
+            label="Gemma Assessment"
+            isActive={currentView === "gemma"}
+            onClick={() => setCurrentView("gemma")}
             isCollapsed={isCollapsed}
           />
           <NavItem
@@ -315,6 +324,9 @@ export default function App() {
             llmModelName={slurmLlmModel}
             onInferenceProcessingChange={setIsInferenceProcessing}
           />
+        )}
+        {currentView === "gemma" && (
+          <GemmaPage onProcessingChange={setIsGemmaProcessing} />
         )}
         {currentView === "models" && (
           <ModelConfigsPage

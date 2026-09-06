@@ -14,6 +14,7 @@ class SlurmConfig:
     remote_repo_dir: str
     embedding_script: str
     llm_script: str
+    gemma_script: str
     poll_interval: float
     allocation_timeout: float
     completion_timeout: float
@@ -34,7 +35,12 @@ class SlurmConfig:
                 "SLURM_LLM_SCRIPT",
                 "DCS_ICS_Interface/backend/slurmBackend/run_llm.sbatch",
             ),
+            gemma_script=os.getenv(
+                "SLURM_GEMMA_SCRIPT",
+                f"{os.getenv('SLURM_REMOTE_REPO_DIR', 'DCS_ICS_Interface').rstrip('/')}"
+                "/backend/slurmBackend/run_gemma.sbatch",
+            ),
             poll_interval=float(os.getenv("SLURM_POLL_INTERVAL", "2")),
-            allocation_timeout=float(os.getenv("SLURM_ALLOCATION_TIMEOUT", "30")),
-            completion_timeout=float(os.getenv("SLURM_COMPLETION_TIMEOUT", "600")),
+            allocation_timeout=float(os.getenv("SLURM_ALLOCATION_TIMEOUT", "120")),
+            completion_timeout=float(os.getenv("SLURM_COMPLETION_TIMEOUT", "900")),
         )

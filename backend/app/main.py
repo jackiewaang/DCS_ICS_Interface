@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from app.api.endpoints.analysis import router as analysis_router
 from app.api.endpoints.cases import router as cases_router
 from app.api.endpoints.feedback import router as feedback_router
+from app.api.endpoints.gemma import router as gemma_router
 
 from app.database import init_db
 from app.config.logging_config import configure_logging
@@ -37,6 +38,7 @@ app.add_middleware(
 app.include_router(cases_router)
 app.include_router(analysis_router)
 app.include_router(feedback_router)
+app.include_router(gemma_router)
 
 @app.get("/api/")
 def read_root():

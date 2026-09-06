@@ -160,6 +160,23 @@ export const api = {
     return normalizeInferenceOutput(output, { ...draft, sections }, configId);
   },
 
+  async runGemmaInference(sections, title) {
+    const response = await fetch(`${API_BASE}/gemma/inference`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-ID": USER_ID,
+      },
+      body: JSON.stringify({
+        title: cleanText(title) || "Untitled inference",
+        summary: sections.summary || "",
+        research: sections.research || "",
+        impact: sections.impact || "",
+      }),
+    });
+    return handleResponse(response);
+  },
+
   async getLLMFeedback(llmInput, signal) {
     const response = await fetch(`${API_BASE}/analysis/llm-feedback`, {
       method: "POST",

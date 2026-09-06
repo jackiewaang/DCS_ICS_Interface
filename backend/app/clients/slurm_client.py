@@ -33,3 +33,6 @@ class SlurmClient:
             {"messages": messages},
             model_name or DEFAULT_LLM_MODEL,
         )
+
+    def run_gemma(self, sections: dict) -> dict:
+        return self.backend.run_gemma(sections)

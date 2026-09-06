@@ -1,0 +1,3 @@
+google/gemma-3-12b-it finetuned for around 3 epochs on the train set of REF2014+REF2021 using the UOA's gpa as a label.
+MAX_INPUT_TOKENS = 4096
+The best checkpoint i.e., with highest balanced accuracy on the 10% holdout set is saved as best_adapter.
