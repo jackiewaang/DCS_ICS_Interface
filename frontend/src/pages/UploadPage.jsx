@@ -61,6 +61,7 @@ export default function UploadPage({
   onRetryModels,
   embeddingModelName,
   llmModelName,
+  onInferenceProcessingChange,
 }) {
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -135,11 +136,12 @@ export default function UploadPage({
   };
 
   const handleRunInference = async () => {
-    if (!activeConfigId || !hasSectionText(draft.sections)) {
+    if (isRunningInference || !activeConfigId || !hasSectionText(draft.sections)) {
       return;
     }
 
     setIsRunningInference(true);
+    onInferenceProcessingChange?.(true);
     setInferenceError(null);
     onClearAnalysis?.();
 
@@ -163,6 +165,7 @@ export default function UploadPage({
       setInferenceError(getUserErrorMessage(err, 'Could not run inference for the current draft.'));
     } finally {
       setIsRunningInference(false);
+      onInferenceProcessingChange?.(false);
     }
   };
 

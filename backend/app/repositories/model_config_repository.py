@@ -27,6 +27,8 @@ def get_global_importance(
     with SessionLocal() as db:
         config = db.get(ModelConfig, numeric_config_id)
         if config and config.feature_importances:
-            return dict(config.feature_importances)
+            importances = {feature_name: 0.0 for feature_name in feature_names or []}
+            importances.update(config.feature_importances)
+            return importances
 
     return {feature_name: 0.0 for feature_name in feature_names or []}

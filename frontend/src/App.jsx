@@ -17,6 +17,7 @@ export default function App() {
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [uploadInferenceResult, setUploadInferenceResult] = useState(null);
+  const [isInferenceProcessing, setIsInferenceProcessing] = useState(false);
   const [models, setModels] = useState([]);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
@@ -174,8 +175,17 @@ export default function App() {
     return sharedResult;
   }, [startLlmFeedback]);
 
+  const isLlmProcessing = inferenceHistory.some(
+    (result) => result.llm_feedback?.status === "running",
+  );
+  const isProcessing = isInferenceProcessing || isLlmProcessing;
+
   return (
-    <div className="flex bg-background overflow-hidden h-screen w-full text-foreground">
+    <fieldset
+      disabled={isProcessing}
+      aria-busy={isProcessing}
+      className="m-0 flex h-screen min-w-0 w-full overflow-hidden border-0 bg-background p-0 text-foreground [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-60 [&_select:disabled]:cursor-not-allowed [&_select:disabled]:opacity-60"
+    >
       <aside className={`bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border shadow-sm z-10 shrink-0 transition-all duration-300 ease-in-out relative ${isCollapsed ? 'w-20' : 'w-68'}`}>
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
@@ -303,6 +313,7 @@ export default function App() {
             onRetryModels={fetchModels}
             embeddingModelName={slurmEmbeddingModel}
             llmModelName={slurmLlmModel}
+            onInferenceProcessingChange={setIsInferenceProcessing}
           />
         )}
         {currentView === "models" && (
@@ -315,6 +326,6 @@ export default function App() {
         )}
         {currentView === "feedback" && <FeedbackPage />}
       </main>
-    </div>
+    </fieldset>
   );
 }
