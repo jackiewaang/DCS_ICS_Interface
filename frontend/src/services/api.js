@@ -1,5 +1,6 @@
 const API_BASE = "/api";
 const USER_ID_KEY = "user_id";
+const JOB_POLL_INTERVAL_MS = 2000;
 
 function createUserId() {
   const generatedId = globalThis.crypto?.randomUUID?.()
@@ -51,6 +52,34 @@ async function handleResponse(response) {
 
 function cleanText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+async function submitAndPollJob(url, options, signal) {
+  const submissionResponse = await fetch(url, { ...options, signal });
+  const submission = await handleResponse(submissionResponse);
+  if (!submission?.job_id) {
+    throw new Error("The analysis service did not return a job identifier.");
+  }
+
+  const jobUrl = `${url.split('?')[0]}/${encodeURIComponent(submission.job_id)}`;
+  while (true) {
+    if (signal?.aborted) throw new DOMException('The request was cancelled.', 'AbortError');
+
+    const statusResponse = await fetch(jobUrl, {
+      headers: { "X-User-ID": USER_ID },
+      signal,
+    });
+    const job = await handleResponse(statusResponse);
+    if (job?.status === "completed") return job.result;
+    if (job?.status === "failed") {
+      throw new Error(job.error || "The analysis job failed.");
+    }
+    if (!['pending', 'running'].includes(job?.status)) {
+      throw new Error("The analysis service returned an invalid job status.");
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, JOB_POLL_INTERVAL_MS));
+  }
 }
 
 function normalizeInferenceOutput(output = {}, draft = {}, configId = null) {
@@ -141,7 +170,7 @@ export const api = {
     if (slurmModels.llmModelName) {
       params.set("llm_model_name", slurmModels.llmModelName);
     }
-    const response = await fetch(`${API_BASE}/analysis/inference?${params}`, {
+    const output = await submitAndPollJob(`${API_BASE}/analysis/jobs?${params}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -156,12 +185,11 @@ export const api = {
         impact: sections.impact || "",
       }),
     });
-    const output = await handleResponse(response);
     return normalizeInferenceOutput(output, { ...draft, sections }, configId);
   },
 
   async runGemmaInference(sections, title) {
-    const response = await fetch(`${API_BASE}/gemma/inference`, {
+    return submitAndPollJob(`${API_BASE}/gemma/jobs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -174,20 +202,17 @@ export const api = {
         impact: sections.impact || "",
       }),
     });
-    return handleResponse(response);
   },
 
   async getLLMFeedback(llmInput, signal) {
-    const response = await fetch(`${API_BASE}/analysis/llm-feedback`, {
+    return submitAndPollJob(`${API_BASE}/analysis/llm-feedback/jobs`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-User-ID": USER_ID,
       },
       body: JSON.stringify(llmInput),
-      signal,
-    });
-    return handleResponse(response);
+    }, signal);
   },
 
   // --- FEEDBACK ---

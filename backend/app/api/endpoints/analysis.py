@@ -19,6 +19,7 @@ from app.clients.slurm_client import SlurmClient
 from app.models.model_configs import ModelConfig
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
+from app.services.job_store import JobForbidden, JobNotFound, job_store
 from app.services.llm_service import LLMService
 from slurmBackend.models import SLURM_EMBEDDING_MODELS, SLURM_LLM_MODELS
 
@@ -147,8 +148,8 @@ def _get_llm_endpoint_model() -> str | None:
         return None
 
 
-@router.post("/inference")
-async def run_inference(
+@router.post("/jobs", status_code=202)
+async def submit_inference_job(
     config_id: int,
     sections: InferenceSections,
     embedding_model_name: str | None = None,
@@ -159,30 +160,78 @@ async def run_inference(
         embedding_model_name, SLURM_EMBEDDING_MODELS, "embedding"
     )
     llm_model_name = _select_slurm_model(llm_model_name, SLURM_LLM_MODELS, "LLM")
-    section_payload = sections.model_dump()
-    output = await asyncio.to_thread(
-        pipeline_manager.run_inference,
-        section_payload,
-        config_id=config_id,
-        embedding_model_name=embedding_model_name,
+    request_id = str(uuid4())
+    job_id = job_store.submit(
+        str(user_id),
+        lambda: _run_inference_job(
+            request_id=request_id,
+            user_id=user_id,
+            config_id=config_id,
+            sections=sections,
+            embedding_model_name=embedding_model_name,
+            llm_model_name=llm_model_name,
+        ),
     )
-    output["global_importance"] = get_global_importance(
-        config_id=config_id,
-        feature_names=output.get("feature_names", []),
+    logger.info(
+        "MIL inference job accepted request_id=%s job_id=%s user_id=%s",
+        request_id,
+        job_id,
+        user_id,
     )
-    _log_inference(user_id, config_id, sections, output["score"])
-    output["llm_input"] = _build_llm_input(sections, output, llm_model_name)
-
-    return output
+    return {"job_id": job_id, "status": "pending"}
 
 
-@router.post("/llm-feedback")
-async def run_llm_feedback(
+@router.get("/jobs/{job_id}")
+async def get_inference_job(
+    job_id: str,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    return _get_job_response(job_id, user_id)
+
+
+async def _run_inference_job(
+    request_id: str,
+    user_id: UUID,
+    config_id: int,
+    sections: InferenceSections,
+    embedding_model_name: str,
+    llm_model_name: str,
+) -> dict:
+    started_at = time.monotonic()
+    try:
+        output = await asyncio.to_thread(
+            pipeline_manager.run_inference,
+            sections.model_dump(),
+            config_id=config_id,
+            embedding_model_name=embedding_model_name,
+        )
+        output["global_importance"] = get_global_importance(
+            config_id=config_id,
+            feature_names=output.get("feature_names", []),
+        )
+        _log_inference(user_id, config_id, sections, output["score"])
+        output["llm_input"] = _build_llm_input(sections, output, llm_model_name)
+        logger.info(
+            "MIL inference job completed request_id=%s elapsed_seconds=%.2f",
+            request_id,
+            time.monotonic() - started_at,
+        )
+        return output
+    except Exception:
+        logger.exception(
+            "MIL inference job failed request_id=%s elapsed_seconds=%.2f",
+            request_id,
+            time.monotonic() - started_at,
+        )
+        raise
+
+
+@router.post("/llm-feedback/jobs", status_code=202)
+async def submit_llm_feedback_job(
     llm_input: LLMInput,
     user_id: UUID = Header(alias="X-User-ID"),
 ):
     request_id = str(uuid4())
-    started_at = time.monotonic()
     logger.info(
         "LLM feedback request started request_id=%s user_id=%s requested_model=%s",
         request_id,
@@ -206,10 +255,36 @@ async def run_llm_feedback(
     payload = llm_input.model_dump()
     payload["model_name"] = model_name
 
+    job_id = job_store.submit(
+        str(user_id),
+        lambda: _run_llm_feedback_job(request_id, payload, model_name),
+    )
+    logger.info(
+        "LLM feedback job accepted request_id=%s job_id=%s",
+        request_id,
+        job_id,
+    )
+    return {"job_id": job_id, "status": "pending"}
+
+
+@router.get("/llm-feedback/jobs/{job_id}")
+async def get_llm_feedback_job(
+    job_id: str,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    return _get_job_response(job_id, user_id)
+
+
+async def _run_llm_feedback_job(
+    request_id: str,
+    payload: dict,
+    model_name: str,
+) -> dict:
+    started_at = time.monotonic()
     try:
         result = await llm_service.generate_feedback(payload, request_id=request_id)
         logger.info(
-            "LLM feedback request completed request_id=%s model=%s elapsed_seconds=%.2f",
+            "LLM feedback job completed request_id=%s model=%s elapsed_seconds=%.2f",
             request_id,
             model_name,
             time.monotonic() - started_at,
@@ -217,13 +292,29 @@ async def run_llm_feedback(
         return result
     except Exception as exc:
         logger.exception(
-            "LLM feedback request failed request_id=%s model=%s elapsed_seconds=%.2f error_type=%s",
+            "LLM feedback job failed request_id=%s model=%s elapsed_seconds=%.2f error_type=%s",
             request_id,
             model_name,
             time.monotonic() - started_at,
             type(exc).__name__,
         )
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise
+
+
+def _get_job_response(job_id: str, user_id: UUID) -> dict:
+    try:
+        job = job_store.get(job_id, str(user_id))
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inference job not found.") from exc
+    except JobForbidden as exc:
+        raise HTTPException(status_code=403, detail="This inference job belongs to another user.") from exc
+
+    response = {"job_id": job_id, "status": job.status}
+    if job.status == "completed":
+        response["result"] = job.result
+    elif job.status == "failed":
+        response["error"] = job.error
+    return response
 
 
 def _log_inference(

@@ -173,7 +173,7 @@ At a high level:
 
 1. The frontend uploads a PDF to `/api/cases/upload`.
 2. The backend extracts text from the PDF and splits it into REF sections.
-3. The frontend sends edited sections to `/api/analysis/inference` with a selected `config_id`.
+3. The frontend submits edited sections to `/api/analysis/jobs` with a selected `config_id`, then polls the returned job ID until inference completes.
 4. The backend loads the selected model configuration from the database.
 5. `feature_extractor` computes GTF-style textual features, readability metrics, sentiment statistics, money values, word/paragraph counts, and spaCy named entities.
 6. Entity counts are added into the feature set in the order expected by the selected model config.

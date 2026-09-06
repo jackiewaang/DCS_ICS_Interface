@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app.clients.slurm_client import SlurmClient
 from app.services.gemma_service import GemmaService
+from app.services.job_store import JobForbidden, JobNotFound, job_store
 
 
 logger = logging.getLogger(__name__)
@@ -26,15 +27,14 @@ class GemmaInferenceSections(BaseModel):
     impact: str = ""
 
 
-@router.post("/inference")
-async def run_gemma_inference(
+@router.post("/jobs", status_code=202)
+async def submit_gemma_job(
     sections: GemmaInferenceSections,
     user_id: UUID = Header(alias="X-User-ID"),
 ):
     request_id = str(uuid4())
-    started_at = time.monotonic()
     logger.info(
-        "Gemma inference request started request_id=%s user_id=%s",
+        "Gemma inference request accepted request_id=%s user_id=%s",
         request_id,
         user_id,
     )
@@ -42,6 +42,39 @@ async def run_gemma_inference(
     if not any((sections.summary.strip(), sections.research.strip(), sections.impact.strip())):
         raise HTTPException(status_code=422, detail="At least one REF section is required.")
 
+    job_id = job_store.submit(
+        str(user_id),
+        lambda: _run_gemma_job(request_id, user_id, sections),
+    )
+    return {"job_id": job_id, "status": "pending"}
+
+
+@router.get("/jobs/{job_id}")
+async def get_gemma_job(
+    job_id: str,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    try:
+        job = job_store.get(job_id, str(user_id))
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="Gemma job not found.") from exc
+    except JobForbidden as exc:
+        raise HTTPException(status_code=403, detail="This Gemma job belongs to another user.") from exc
+
+    response = {"job_id": job_id, "status": job.status}
+    if job.status == "completed":
+        response["result"] = job.result
+    elif job.status == "failed":
+        response["error"] = job.error
+    return response
+
+
+async def _run_gemma_job(
+    request_id: str,
+    user_id: UUID,
+    sections: GemmaInferenceSections,
+) -> dict:
+    started_at = time.monotonic()
     try:
         result = await gemma_service.run_inference(
             sections.model_dump(),
@@ -49,19 +82,18 @@ async def run_gemma_inference(
         )
         _log_inference(user_id, sections, result)
         logger.info(
-            "Gemma inference request completed request_id=%s elapsed_seconds=%.2f",
+            "Gemma inference job completed request_id=%s elapsed_seconds=%.2f",
             request_id,
             time.monotonic() - started_at,
         )
         return result
-    except Exception as exc:
+    except Exception:
         logger.exception(
-            "Gemma inference request failed request_id=%s elapsed_seconds=%.2f error_type=%s",
+            "Gemma inference job failed request_id=%s elapsed_seconds=%.2f",
             request_id,
             time.monotonic() - started_at,
-            type(exc).__name__,
         )
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise
 
 
 def _log_inference(

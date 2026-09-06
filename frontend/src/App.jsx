@@ -10,8 +10,6 @@ import GemmaPage from "./pages/GemmaPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
-const LLM_TIMEOUT_MS = 700_000;
-
 export default function App() {
   const [currentView, setCurrentView] = useState("upload");
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -108,11 +106,7 @@ export default function App() {
     if (!inferenceId || !result.llm_input || llmStartedIds.current.has(inferenceId)) return;
 
     const controller = new AbortController();
-    const request = { controller, didTimeout: false, timeoutId: null };
-    request.timeoutId = window.setTimeout(() => {
-      request.didTimeout = true;
-      controller.abort();
-    }, LLM_TIMEOUT_MS);
+    const request = { controller };
     llmStartedIds.current.add(inferenceId);
     llmRequests.current.set(inferenceId, request);
 
@@ -125,17 +119,14 @@ export default function App() {
         });
       })
       .catch((error) => {
-        if (error.name === "AbortError" && !request.didTimeout) return;
+        if (error.name === "AbortError") return;
         updateLlmFeedback(inferenceId, {
           result: null,
           status: "error",
-          errorMessage: request.didTimeout
-            ? "AI insight generation timed out after five minutes."
-            : getUserErrorMessage(error, "AI insights could not be generated. Please try again later."),
+          errorMessage: getUserErrorMessage(error, "AI insights could not be generated. Please try again later."),
         });
       })
       .finally(() => {
-        window.clearTimeout(request.timeoutId);
         if (llmRequests.current.get(inferenceId) === request) {
           llmRequests.current.delete(inferenceId);
         }
@@ -143,8 +134,7 @@ export default function App() {
   }, [updateLlmFeedback]);
 
   useEffect(() => () => {
-    llmRequests.current.forEach(({ controller, timeoutId }) => {
-      window.clearTimeout(timeoutId);
+    llmRequests.current.forEach(({ controller }) => {
       controller.abort();
     });
     llmRequests.current.clear();
