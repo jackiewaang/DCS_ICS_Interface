@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./services/api";
-import { Bot, Cpu, Database, History as HistoryIcon, Upload, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare, Sparkles } from "lucide-react";
+import { Bot, Cpu, Database, History as HistoryIcon, Upload, LayoutDashboard, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react";
 import FeedbackPage from "./pages/FeedbackPage";
 import RuntimeModelCard from "./components/RuntimeModelCard";
 import InferenceHistoryPage from "./pages/InferenceHistoryPage";
 import ModelConfigsPage from "./pages/ModelConfigsPage";
 import UploadPage from "./pages/UploadPage";
-import GemmaPage from "./pages/GemmaPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
@@ -17,7 +16,7 @@ export default function App() {
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [uploadInferenceResult, setUploadInferenceResult] = useState(null);
   const [isInferenceProcessing, setIsInferenceProcessing] = useState(false);
-  const [isGemmaProcessing, setIsGemmaProcessing] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [models, setModels] = useState([]);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
@@ -170,7 +169,19 @@ export default function App() {
   const isLlmProcessing = inferenceHistory.some(
     (result) => result.llm_feedback?.status === "running",
   );
-  const isProcessing = isInferenceProcessing || isGemmaProcessing || isLlmProcessing;
+  const isProcessing = isInferenceProcessing || isLlmProcessing;
+
+  useEffect(() => {
+    if (!isProcessing) return undefined;
+
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isProcessing]);
+
+  const elapsedTime = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
 
   return (
     <fieldset
@@ -192,7 +203,11 @@ export default function App() {
             <LayoutDashboard className="h-4 w-4 text-sidebar-foreground/80 shrink-0" />
             {!isCollapsed && <span>REF Analysis</span>}
           </h2>
-          {!isCollapsed && <p className="text-[11px] text-sidebar-foreground/70 mt-1">Impact case evaluation</p>}
+          {!isCollapsed && isProcessing && (
+            <p className="mt-1 text-[11px] tabular-nums text-sidebar-foreground/70">
+              Running · {elapsedTime}
+            </p>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-3">
@@ -201,13 +216,6 @@ export default function App() {
             label="Upload New Case"
             isActive={currentView === "upload"}
             onClick={() => setCurrentView("upload")}
-            isCollapsed={isCollapsed}
-          />
-          <NavItem
-            icon={<Sparkles className="h-4 w-4 shrink-0" />}
-            label="Gemma Assessment"
-            isActive={currentView === "gemma"}
-            onClick={() => setCurrentView("gemma")}
             isCollapsed={isCollapsed}
           />
           <NavItem
@@ -312,11 +320,11 @@ export default function App() {
             onRetryModels={fetchModels}
             embeddingModelName={slurmEmbeddingModel}
             llmModelName={slurmLlmModel}
-            onInferenceProcessingChange={setIsInferenceProcessing}
+            onInferenceProcessingChange={(processing) => {
+              if (processing) setElapsedSeconds(0);
+              setIsInferenceProcessing(processing);
+            }}
           />
-        )}
-        {currentView === "gemma" && (
-          <GemmaPage onProcessingChange={setIsGemmaProcessing} />
         )}
         {currentView === "models" && (
           <ModelConfigsPage

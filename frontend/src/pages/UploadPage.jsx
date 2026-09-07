@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { FilePlus2 } from 'lucide-react';
 import { api } from '@/services/api';
 import InferenceResults from '@/components/InferenceResults';
+import GemmaResults from '@/components/GemmaResults';
 import SectionEditor from '@/components/SectionEditor';
 import ErrorAlert from '@/components/ui/ErrorAlert';
 import { getUserErrorMessage } from '@/helper/error_messages';
@@ -66,10 +67,13 @@ export default function UploadPage({
   const [file, setFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRunningInference, setIsRunningInference] = useState(false);
+  const [isRunningGemma, setIsRunningGemma] = useState(false);
   const [isEditorCollapsed, setIsEditorCollapsed] = useState(false);
   const [error, setError] = useState(null);
   const [inferenceError, setInferenceError] = useState(null);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [gemmaResult, setGemmaResult] = useState(null);
+  const [resultView, setResultView] = useState('original');
   const [collapsedSections, setCollapsedSections] = useState(EXPANDED_SECTIONS);
   const fileInputRef = useRef(null);
 
@@ -83,6 +87,8 @@ export default function UploadPage({
     if (!isPdf) {
       setFile(null);
       setDraft(EMPTY_DRAFT);
+      setGemmaResult(null);
+      setResultView('original');
       onClearAnalysis?.();
       setError('Only PDF files are supported.');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -92,6 +98,8 @@ export default function UploadPage({
     if (selectedFile.size === 0) {
       setFile(null);
       setDraft(EMPTY_DRAFT);
+      setGemmaResult(null);
+      setResultView('original');
       onClearAnalysis?.();
       setError('The selected PDF is empty. Choose a valid case-study file.');
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -100,6 +108,8 @@ export default function UploadPage({
 
     setFile(selectedFile);
     setDraft(EMPTY_DRAFT); 
+    setGemmaResult(null);
+    setResultView('original');
     setCollapsedSections(EXPANDED_SECTIONS);
     onClearAnalysis?.();
     setError(null);
@@ -126,6 +136,8 @@ export default function UploadPage({
         },
       });
       setCollapsedSections(EXPANDED_SECTIONS);
+      setGemmaResult(null);
+      setResultView('original');
       onClearAnalysis?.();
     } catch (err) {
       console.error('Upload Error:', err);
@@ -136,13 +148,15 @@ export default function UploadPage({
   };
 
   const handleRunInference = async () => {
-    if (isRunningInference || !activeConfigId || !hasSectionText(draft.sections)) {
+    if (isRunningInference || isRunningGemma || !activeConfigId || !hasSectionText(draft.sections)) {
       return;
     }
 
     setIsRunningInference(true);
     onInferenceProcessingChange?.(true);
     setInferenceError(null);
+    setGemmaResult(null);
+    setResultView('original');
     onClearAnalysis?.();
 
     try {
@@ -169,13 +183,39 @@ export default function UploadPage({
     }
   };
 
+  const handleRunGemma = async () => {
+    if (isRunningInference || isRunningGemma || !hasSectionText(draft.sections)) return;
+
+    setIsRunningGemma(true);
+    onInferenceProcessingChange?.(true);
+    setInferenceError(null);
+    setGemmaResult(null);
+    setResultView('gemma');
+    onClearAnalysis?.();
+
+    try {
+      const result = await api.runGemmaInference(draft.sections, draft.title);
+      setGemmaResult(result);
+      setCollapsedSections(COLLAPSED_SECTIONS);
+    } catch (err) {
+      console.error('Gemma Inference Error:', err);
+      setInferenceError(getUserErrorMessage(err, 'Could not run the Gemma assessment.'));
+    } finally {
+      setIsRunningGemma(false);
+      onInferenceProcessingChange?.(false);
+    }
+  };
+
   const removeFile = () => {
     setFile(null);
     setIsUploading(false);
     setIsRunningInference(false);
+    setIsRunningGemma(false);
     setError(null);
     setInferenceError(null);
     setDraft(EMPTY_DRAFT);
+    setGemmaResult(null);
+    setResultView('original');
     setCollapsedSections(EXPANDED_SECTIONS);
     onClearAnalysis?.();
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -199,7 +239,9 @@ export default function UploadPage({
   };
 
   const hasDraft = Boolean(draft.title || hasSectionText(draft.sections));
-  const canRunInference = Boolean(activeConfigId && hasSectionText(draft.sections) && !isRunningInference);
+  const isRunning = isRunningInference || isRunningGemma;
+  const canRunInference = Boolean(activeConfigId && hasSectionText(draft.sections) && !isRunning);
+  const canRunGemma = Boolean(hasSectionText(draft.sections) && !isRunning);
 
   return (
     <div className="flex min-h-full w-full flex-col gap-6 p-6 md:p-8">
@@ -241,18 +283,23 @@ export default function UploadPage({
           onRemoveFile={removeFile}
           onExtract={handleUpload}
           onRunInference={handleRunInference}
+          onRunGemma={handleRunGemma}
           onTitleChange={(value) => setDraft((current) => ({ ...current, title: value }))}
           onSectionChange={updateSection}
           onToggleSection={toggleSection}
           isUploading={isUploading}
           isRunningInference={isRunningInference}
+          isRunningGemma={isRunningGemma}
           canRunInference={canRunInference}
+          canRunGemma={canRunGemma}
           error={error}
           inferenceError={inferenceError}
           hasDraft={hasDraft}
         />
 
-        <InferenceResults data={inferenceResult} />
+        {resultView === 'gemma'
+          ? <GemmaResults data={gemmaResult} />
+          : <InferenceResults data={inferenceResult} />}
       </div>
     </div>
   );

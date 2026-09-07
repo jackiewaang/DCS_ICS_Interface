@@ -1,6 +1,6 @@
 const API_BASE = "/api";
 const USER_ID_KEY = "user_id";
-const JOB_POLL_INTERVAL_MS = 2000;
+const JOB_POLL_INTERVAL_MS = 10000;
 
 function createUserId() {
   const generatedId = globalThis.crypto?.randomUUID?.()
