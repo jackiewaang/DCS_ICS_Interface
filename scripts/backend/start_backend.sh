@@ -7,6 +7,7 @@ FRONTEND_DIR="$REPO_ROOT/frontend"
 
 # Build frontend and copy to htdocs
 cd "$FRONTEND_DIR"
+npm install
 npm run build
 mkdir -p "$HOME/apache/htdocs"
 cp -rf dist/* "$HOME/apache/htdocs/"
