@@ -1,189 +1,133 @@
 # DCS ICS Interface
 
-React/Vite frontend and FastAPI backend for uploading REF impact case studies, running the trained AttentionMIL inference pipeline, browsing previous cases, and generating LLM review feedback.
+DCS ICS Interface is a developer-facing React and FastAPI application for analysing REF impact case studies. It extracts editable sections from uploaded PDFs, runs AttentionMIL inference, generates AI insights, offers a separate fine-tuned Gemma assessment, and exports results as PDFs.
 
-## Project Structure
+## Architecture
 
-- `backend/` - FastAPI API server, SQLite database, model assets, inference pipeline, Slurm client/workers, and Python dependencies.
-- `frontend/` - React development frontend built with Vite.
-- `vllm/` - helper script for starting the local OpenAI-compatible vLLM server used by the LLM review feature.
+```text
+Browser
+  |
+  v
+React frontend served by Apache on Wagtail
+  |
+  | /api via ProxyPass + ProxyPassReverse
+  v
+FastAPI backend on Wagtail
+  |-- SQLite: model configurations and submitted feedback
+  |-- JSONL logs: user inference inputs and outputs
+  |-- in-memory job store: active and recently completed API jobs
+  |
+  |-- primary --> Slurm GPU jobs on kudu
+  |                |-- sentence embeddings
+  |                |-- AI insights
+  |                `-- fine-tuned Gemma assessment
+  |
+  `-- fallback --> Aquifer GPU services
+                   |-- Qwen3-Embedding-4B
+                   `-- Qwen3-4B-Instruct
+```
+
+Apache serves the compiled frontend and routes `/api` to FastAPI using `ProxyPass` and `ProxyPassReverse`. The deployment-specific routing is in `apache/conf/httpd.conf` on Wagtail; that file is not part of this repository.
+
+Slurm is the primary execution environment because it provides access to higher-capacity GPUs. If Slurm embedding or AI-insight generation fails, the backend falls back to the Aquifer services. Aquifer has less GPU memory, so its fallback services use the Qwen3 4B embedding and instruction models configured in [`.env.example`](.env.example). Gemma uses its own Slurm-only pipeline and has no Aquifer fallback.
+
+## Repository structure
+
+- [`frontend/`](frontend/README.md) — React interface, temporary session history, result views, and PDF exports.
+- [`backend/`](backend/README.md) — FastAPI API, AttentionMIL pipeline, persistence, and inference-service coordination.
+- [`backend/slurmBackend/`](backend/slurmBackend/README.md) — SSH/Slurm transport and remote embedding, AI-insight, and Gemma workers.
+- [`embedding/`](embedding/) — Aquifer fallback embedding service.
+- [`vllm/`](vllm/) — environment for Aquifer vLLM and the remote vLLM workers.
+- [`scripts/`](scripts/README.md) — setup, startup, and feedback-export scripts.
+- [`backend/assets/models/`](backend/assets/models/) — AttentionMIL model packages and the fine-tuned Gemma adapter.
 
 ## Requirements
 
-- Python 3.11. The current backend script loads `Python/3.11.5-GCCcore-13.2.0` on the target cluster.
-- Node.js 20.19+ or 22.12+. The frontend uses Vite 7, which requires a recent Node runtime.
-- A CUDA-capable environment for vLLM if LLM review generation is required.
-- The required embedding/model assets under `backend/assets/models/`.
-- For vLLM review generation, the chat model must already be available through Hugging Face cache or equivalent local model access. Some models may require Hugging Face authentication before they can be downloaded or loaded.
+- Python 3.11 is the stable project version and should be used for compatibility.
+- Node.js and npm compatible with Vite 7.
+- CUDA-capable environments on Aquifer and the Slurm workers.
+- SSH access from Wagtail to the configured Slurm host and proxy jump.
+- Access to the Hugging Face models configured in [`.env.example`](.env.example) and [`backend/slurmBackend/models.py`](backend/slurmBackend/models.py).
 
-Key pinned backend packages include FastAPI `0.135.1`, Uvicorn `0.41.0`, Sentence Transformers `5.3.0`, PyTorch `2.11.0`, and vLLM `0.25.1`.
+The backend uses both installed English spaCy pipelines for different work:
 
-## Backend Setup
+- `en_core_web_sm` performs sentence segmentation, sentiment input preparation, and aggregate counts for organisations, people, locations, and money mentions.
+- `en_core_web_trf` performs the detailed named-entity extraction used in the AttentionMIL feature vector and entity display.
 
-Create the virtual environment inside the `backend/` directory. The existing scripts expect the environment to be named `venv311`.
+The project uses three separate virtual environments:
 
-```bash
-cd backend
-python3.11 -m venv venv311
-source venv311/bin/activate
+- `backend/venv-backend` for FastAPI, feature extraction, SQLite, and CPU AttentionMIL inference.
+- `embedding/venv-embedding` for the CUDA Sentence Transformers embedding service.
+- `vllm/venv-vllm` for the CUDA vLLM service and remote LLM/Gemma workers.
 
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-If you are running on the cluster environment used by this project, load Python first:
+## Clone and configure
 
 ```bash
-module load Python/3.11.5-GCCcore-13.2.0
+git clone git@github.com:jackiewaang/DCS_ICS_Interface.git
+cd DCS_ICS_Interface
+cp .env.example .env
 ```
 
-## Run The Backend
+Update `.env` with the Wagtail, Aquifer, SSH, Slurm, remote repository, model, and timeout values for the deployment.
 
-Run the backend from inside the `backend/` directory:
+## Setup
+
+Run the setup scripts from the repository root in the environments where each service will execute:
 
 ```bash
-cd backend
-./app/start.sh
+./scripts/backend/setup_backend.sh
+./scripts/embedding/setup_embedding.sh
+./scripts/vllm/setup_llm.sh
 ```
 
-The script starts FastAPI with Uvicorn:
+Backend setup installs both spaCy models and the NLTK VADER lexicon. Frontend packages are installed by `start_backend.sh` before it builds the production bundle.
+
+## Run
+
+On Aquifer, start the local fallback services:
 
 ```bash
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 11005
+./scripts/embedding/start_embedding.sh
+./scripts/vllm/start_llm.sh
 ```
 
-On first startup, the FastAPI lifespan hook calls `init_db()`. If the SQLite database does not already exist, this creates the database tables and seeds model configuration rows from `backend/assets/models/**/model_config.json`.
-
-Backend URLs:
-
-- Health check: `http://localhost:11005/`
-- API docs: `http://localhost:11005/docs`
-- API base: `http://localhost:11005/api`
-
-The current startup script is working-directory sensitive because it activates `venv311/bin/activate` with a relative path. Run it from `backend/`.
-
-## Frontend Setup
-
-In a second terminal:
+On Wagtail, start the backend and build/deploy the frontend:
 
 ```bash
-cd frontend
-npm install
-npm run dev
+./scripts/backend/start_backend.sh
 ```
 
-Vite will print the development URL, usually `http://localhost:5173`.
+The backend startup installs frontend packages, builds `frontend/dist/`, copies the result into `$HOME/apache/htdocs/`, loads `.env`, and starts FastAPI with Uvicorn. Apache is managed separately.
 
-The frontend currently uses:
+## AttentionMIL pipeline
 
-```js
-const API_BASE = "/api";
-```
+The PDF upload endpoint uses the numbered REF headings to delimit the document and returns sections 1 (summary), 2 (underpinning research), and 4 (details of impact) for review. During inference, the backend:
 
-For local development, make sure requests to `/api` reach the FastAPI backend.
+1. combines the edited sections and calculates readability, sentiment, structural, monetary, and named-entity features;
+2. segments the narrative into sentences and requests Qwen3 sentence embeddings;
+3. passes the sentence embeddings and ordered case features to the selected AttentionMIL checkpoint;
+4. returns the classification score, attention weights, feature gates, contribution values, and model metadata;
+5. makes the completed MIL output available before AI-insight generation begins as a separate job.
 
-The frontend also supports sample-data mode:
+Two AttentionMIL configurations are currently discovered from [`backend/assets/models/`](backend/assets/models/) and seeded into SQLite:
 
-```bash
-VITE_USE_SAMPLE_DATA=true npm run dev
-```
+- **Quantile** — [`Qwen3-Embedding-4B-quantile/model_config.json`](backend/assets/models/Qwen3-Embedding-4B-quantile/model_config.json) was configured using the top and bottom 20% of GPA labels and distinguishes 4-star/high-impact cases from 1–2-star/low-impact cases.
+- **Threshold** — [`Qwen3-Embedding-4B-threshold/model_config.json`](backend/assets/models/Qwen3-Embedding-4B-threshold/model_config.json) focuses on the boundary between 4-star and 3-star impact, using the configured 3.5 GPA threshold.
 
-## vLLM Setup
+Both configurations use sentence-level Qwen3-Embedding-4B inputs, normalised case features, and gated feature fusion. The selected configuration controls the checkpoint, scaler, feature order, and classification interpretation.
 
-The LLM review feature expects an OpenAI-compatible vLLM server on port `8000`.
+## Job handling
 
-Run the script from inside the `vllm/` directory:
+MIL, AI-insight, and Gemma requests use asynchronous job endpoints. FastAPI creates a user-owned record in [`backend/app/services/job_store.py`](backend/app/services/job_store.py), returns a job ID immediately, and executes the blocking pipeline outside the event loop. The React client polls the matching status endpoint every 10 seconds until the job completes or fails.
 
-```bash
-cd vllm
-./start_llm.sh
-```
+Job records are held only in backend memory. Access is scoped by the browser-generated `X-User-ID`, completed records expire after one hour, and all records disappear when the backend restarts. AI insights are a separate job started after MIL completes; their polling continues while the user navigates within the application. Gemma is also a separate job and does not trigger MIL or AI-insight execution.
 
-The model must already be available to the environment, for example through the Hugging Face cache. If the model is gated or private, make sure Hugging Face authentication is configured before starting vLLM.
+## Persistence and exports
 
-The backend LLM client calls:
+The persistence layers have deliberately different roles:
 
-```text
-http://localhost:8000/v1
-```
+- `backend/database.db` stores only seeded model configurations and submitted feedback.
+- `logs-users/<user-id>/inferences.jsonl` and `gemma_inferences.jsonl` record user inputs and the corresponding logged outputs. They are operational/research logs, not the source for frontend history.
+- The frontend holds MIL results, AI insights, and Gemma results temporarily in React state for the current browser session. Refreshing the page clears that history.
 
-## Typical Development Workflow
-
-Use three terminals when running the complete development stack:
-
-```bash
-# Terminal 1
-cd backend
-./app/start.sh
-```
-
-```bash
-# Terminal 2
-cd frontend
-npm run dev
-```
-
-```bash
-# Terminal 3, optional for LLM review generation
-cd vllm
-./start_llm.sh
-```
-
-The core upload and model inference flow can run without vLLM, but LLM review generation requires the vLLM server.
-
-## Slurm-first inference with Aquifer fallback
-
-Embedding generation and LLM feedback now submit GPU jobs through
-`backend/slurmBackend` first. If submission, allocation, execution, result parsing,
-or either configured Slurm timeout fails, the backend logs the failure and retries
-the same operation through the existing local services (Aquifer):
-
-- Embeddings: `http://localhost:8001/embed`
-- LLM feedback: the OpenAI-compatible endpoint configured by `VLLM_BASE_URL`
-
-Configure the Slurm connection in `backend/.env`. The remote repository must use
-the same layout, including these relocated script paths:
-
-```text
-DCS_ICS_Interface/backend/slurmBackend/run_embedding.sbatch
-DCS_ICS_Interface/backend/slurmBackend/run_llm.sbatch
-```
-
-The user-selectable remote model allowlists are defined in
-`backend/slurmBackend/models.py`. Aquifer fallback keeps its existing fixed
-embedding and LLM models.
-
-## Database Initialisation
-
-The backend uses a local SQLite database. On first backend startup, `app.database.init_db.init_db()` checks whether the DB file exists. If it does not exist, it creates tables through SQLAlchemy metadata and seeds model configurations from the model asset folders.
-
-## Inference Pipeline Overview
-
-The main inference path is handled by `backend/app/pipeline/manager.py`.
-
-At a high level:
-
-1. The frontend uploads a PDF to `/api/cases/upload`.
-2. The backend extracts text from the PDF and splits it into REF sections.
-3. The frontend sends edited sections to `/api/analysis/inference` with a selected `config_id`.
-4. The backend loads the selected model configuration from the database.
-5. `feature_extractor` computes GTF-style textual features, readability metrics, sentiment statistics, money values, word/paragraph counts, and spaCy named entities.
-6. Entity counts are added into the feature set in the order expected by the selected model config.
-7. `embedder` builds sentence-level or full-document inputs and generates embeddings using the configured embedding model.
-8. The pipeline saves the generated embeddings under `backend/embeddings/`.
-9. `ModelRunner` loads the trained AttentionMIL checkpoint and optional scaler, runs prediction, and returns score, label, attention weights, feature gates, and contribution estimates.
-10. The API saves the document, feature payload, inference output, and attention rows to the database.
-11. A background LLM review task is scheduled. If vLLM is running, it generates structured review feedback and stores it with the inference.
-
-The model configuration is important: embedding model, input granularity, feature order, scaler, and checkpoint must match how the model was trained.
-
-## Future Static Frontend Deployment
-
-The current setup uses Vite in development mode. Later, the frontend can be built with:
-
-```bash
-cd frontend
-npm run build
-```
-
-The generated `frontend/dist/` files can then be served by FastAPI or by a production web server. In that deployment shape, users should only need to start the FastAPI backend, which will serve both API routes and the built frontend assets.
+Users should export important MIL or Gemma results as PDFs before refreshing or closing the application.

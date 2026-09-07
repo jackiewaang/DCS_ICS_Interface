@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from app.models.inference import ModelConfig
+from app.models.model_configs import ModelConfig
 from app.pipeline.feature_schema import DEFAULT_FEATURE_ORDER
 
 

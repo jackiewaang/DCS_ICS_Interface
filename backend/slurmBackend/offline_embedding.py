@@ -43,7 +43,7 @@ def main() -> None:
     embeddings = model.encode(
         texts,
         prompt=prompt,
-        batch_size=int(os.getenv("EMBEDDING_BATCH_SIZE", "8")),
+        batch_size=int(os.getenv("SLURM_EMBEDDING_BS", "8")),
     ).astype("float32")
 
     with temporary_output_path.open("w", encoding="utf-8") as output_file:

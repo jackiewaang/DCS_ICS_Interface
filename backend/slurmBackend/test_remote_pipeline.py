@@ -6,7 +6,7 @@ from slurmBackend.config import SlurmConfig
 from dotenv import load_dotenv
 from pathlib import Path
 
-ENV_PATH = Path(__file__).resolve().parent / ".env"
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 load_dotenv(ENV_PATH)
 
 def main() -> None:

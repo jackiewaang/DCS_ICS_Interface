@@ -2,7 +2,7 @@ from app.database.seed_models import seed_models
 from app.database.session import DB_PATH, engine
 from app.models.base import Base
 
-from app.models import document, feedback, inference
+from app.models import feedback, model_configs
 
 
 def init_db():

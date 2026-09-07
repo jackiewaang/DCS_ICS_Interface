@@ -1,9 +1,11 @@
+import asyncio
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import requests
 from dotenv import dotenv_values
@@ -12,31 +14,37 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.database import SessionLocal
-from app.llm.service import generate_feedback
-from app.models.document import DocumentFeatures, DocumentMetadata
-from app.models.inference import (
-    Attention,
-    Inference,
-    ModelConfig,
-)
+from app.clients.aquifer_llm_client import AquiferLLMClient
+from app.clients.slurm_client import SlurmClient
+from app.models.model_configs import ModelConfig
 from app.pipeline.manager import PipelineManager
 from app.repositories.model_config_repository import get_global_importance
-from app.retention import user_analysis_expiry
+from app.services.job_store import JobForbidden, JobNotFound, job_store
+from app.services.llm_service import LLMService
 from slurmBackend.models import SLURM_EMBEDDING_MODELS, SLURM_LLM_MODELS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 pipeline_manager = PipelineManager()
+llm_service = LLMService(
+    slurm_client=SlurmClient(),
+    aquifer_client=AquiferLLMClient(),
+)
 REPO_ROOT = Path(__file__).resolve().parents[4]
 LOGS_DIR = REPO_ROOT / "logs-users"
-EMBEDDING_ENV_PATH = REPO_ROOT / "embedding" / ".env"
-VLLM_ENV_PATH = REPO_ROOT / "vllm" / ".env"
+ENV_PATH = REPO_ROOT / ".env"
+
 EMBEDDING_HEALTH_URL = os.getenv(
-    "EMBEDDING_HEALTH_URL",
+    "AQUIFER_EMBEDDING_HEALTH",
     "http://localhost:8001/health",
 )
-VLLM_BASE_URL = os.getenv("VLLM_BASE_URL", "http://localhost:8002/v1").rstrip("/")
+
+VLLM_BASE_URL = os.getenv(
+    "VLLM_BASE_URL",
+    "http://localhost:8002/v1"
+).rstrip("/")
+
 RUNTIME_MODEL_LOOKUP_TIMEOUT = 2
 
 
@@ -61,8 +69,8 @@ class LLMInput(BaseModel):
 
 @router.get("/runtime-models")
 def get_runtime_models():
-    embedding_model = _read_env_value(EMBEDDING_ENV_PATH, "EMBEDDING_MODEL")
-    llm_model = _read_env_value(VLLM_ENV_PATH, "LLM_MODEL_NAME")
+    embedding_model = _read_env_value(ENV_PATH, "AQUIFER_EMBEDDING_MODEL")
+    llm_model = _read_env_value(ENV_PATH, "AQUIFER_LLM_MODEL")
 
     embedding_source = "environment"
     llm_source = "environment"
@@ -140,8 +148,8 @@ def _get_llm_endpoint_model() -> str | None:
         return None
 
 
-@router.post("/inference")
-async def run_inference(
+@router.post("/jobs", status_code=202)
+async def submit_inference_job(
     config_id: int,
     sections: InferenceSections,
     embedding_model_name: str | None = None,
@@ -152,28 +160,90 @@ async def run_inference(
         embedding_model_name, SLURM_EMBEDDING_MODELS, "embedding"
     )
     llm_model_name = _select_slurm_model(llm_model_name, SLURM_LLM_MODELS, "LLM")
-    section_payload = sections.model_dump()
-    output = pipeline_manager.run_inference(
-        section_payload,
-        config_id=config_id,
-        embedding_model_name=embedding_model_name,
+    request_id = str(uuid4())
+    job_id = job_store.submit(
+        str(user_id),
+        lambda: _run_inference_job(
+            request_id=request_id,
+            user_id=user_id,
+            config_id=config_id,
+            sections=sections,
+            embedding_model_name=embedding_model_name,
+            llm_model_name=llm_model_name,
+        ),
     )
-    output["global_importance"] = get_global_importance(
-        config_id=config_id,
-        feature_names=output.get("feature_names", []),
+    logger.info(
+        "MIL inference job accepted request_id=%s job_id=%s user_id=%s",
+        request_id,
+        job_id,
+        user_id,
     )
-    _log_inference(user_id, config_id, sections, output["score"])
-    output["llm_input"] = _build_llm_input(sections, output, llm_model_name)
-
-    return output
+    return {"job_id": job_id, "status": "pending"}
 
 
-@router.post("/llm-feedback")
-async def run_llm_feedback(
+@router.get("/jobs/{job_id}")
+async def get_inference_job(
+    job_id: str,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    return _get_job_response(job_id, user_id)
+
+
+async def _run_inference_job(
+    request_id: str,
+    user_id: UUID,
+    config_id: int,
+    sections: InferenceSections,
+    embedding_model_name: str,
+    llm_model_name: str,
+) -> dict:
+    started_at = time.monotonic()
+    try:
+        output = await asyncio.to_thread(
+            pipeline_manager.run_inference,
+            sections.model_dump(),
+            config_id=config_id,
+            embedding_model_name=embedding_model_name,
+        )
+        output["global_importance"] = get_global_importance(
+            config_id=config_id,
+            feature_names=output.get("feature_names", []),
+        )
+        _log_inference(user_id, config_id, sections, output["score"])
+        output["llm_input"] = _build_llm_input(sections, output, llm_model_name)
+        logger.info(
+            "MIL inference job completed request_id=%s elapsed_seconds=%.2f",
+            request_id,
+            time.monotonic() - started_at,
+        )
+        return output
+    except Exception:
+        logger.exception(
+            "MIL inference job failed request_id=%s elapsed_seconds=%.2f",
+            request_id,
+            time.monotonic() - started_at,
+        )
+        raise
+
+
+@router.post("/llm-feedback/jobs", status_code=202)
+async def submit_llm_feedback_job(
     llm_input: LLMInput,
     user_id: UUID = Header(alias="X-User-ID"),
 ):
+    request_id = str(uuid4())
+    logger.info(
+        "LLM feedback request started request_id=%s user_id=%s requested_model=%s",
+        request_id,
+        user_id,
+        llm_input.model_name,
+    )
+
     if not (LOGS_DIR / str(user_id)).is_dir():
+        logger.warning(
+            "LLM feedback request rejected request_id=%s reason=missing_inference_log",
+            request_id,
+        )
         raise HTTPException(
             status_code=403,
             detail="Run MIL inference before requesting LLM feedback.",
@@ -185,11 +255,66 @@ async def run_llm_feedback(
     payload = llm_input.model_dump()
     payload["model_name"] = model_name
 
+    job_id = job_store.submit(
+        str(user_id),
+        lambda: _run_llm_feedback_job(request_id, payload, model_name),
+    )
+    logger.info(
+        "LLM feedback job accepted request_id=%s job_id=%s",
+        request_id,
+        job_id,
+    )
+    return {"job_id": job_id, "status": "pending"}
+
+
+@router.get("/llm-feedback/jobs/{job_id}")
+async def get_llm_feedback_job(
+    job_id: str,
+    user_id: UUID = Header(alias="X-User-ID"),
+):
+    return _get_job_response(job_id, user_id)
+
+
+async def _run_llm_feedback_job(
+    request_id: str,
+    payload: dict,
+    model_name: str,
+) -> dict:
+    started_at = time.monotonic()
     try:
-        return await generate_feedback(payload)
+        result = await llm_service.generate_feedback(payload, request_id=request_id)
+        logger.info(
+            "LLM feedback job completed request_id=%s model=%s elapsed_seconds=%.2f",
+            request_id,
+            model_name,
+            time.monotonic() - started_at,
+        )
+        return result
     except Exception as exc:
-        logger.exception("LLM feedback generation failed")
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        logger.exception(
+            "LLM feedback job failed request_id=%s model=%s elapsed_seconds=%.2f error_type=%s",
+            request_id,
+            model_name,
+            time.monotonic() - started_at,
+            type(exc).__name__,
+        )
+        raise
+
+
+def _get_job_response(job_id: str, user_id: UUID) -> dict:
+    try:
+        job = job_store.get(job_id, str(user_id))
+    except JobNotFound as exc:
+        raise HTTPException(status_code=404, detail="Inference job not found.") from exc
+    except JobForbidden as exc:
+        raise HTTPException(status_code=403, detail="This inference job belongs to another user.") from exc
+
+    response = {"job_id": job_id, "status": job.status}
+    if job.status == "completed":
+        response["result"] = job.result
+    elif job.status == "failed":
+        response["error"] = job.error
+    return response
 
 
 def _log_inference(
@@ -281,80 +406,3 @@ def _select_slurm_model(
     model_name = requested_model or allowed_models[0]
     _validate_slurm_model(model_name, allowed_models, kind)
     return model_name
-
-
-def _save_inference_output(
-    config_id: int,
-    sections: InferenceSections,
-    output: dict,
-) -> dict:
-    title = _normalise_title(sections.title)
-    features = output.get("features") or {}
-    entities = output.get("entities") or {}
-    sentences = output.get("sentences") or []
-    attention = output.get("attention") or []
-    feature_names = output.get("feature_names") or []
-    feature_gates = output.get("feature_gates") or []
-    feature_attributions = {
-        name: value
-        for name, value in zip(feature_names, feature_gates)
-    }
-
-    with SessionLocal() as db:
-        document = DocumentMetadata(
-            title=title,
-            institution=sections.institution,
-            uoa=sections.uoa,
-            raw_text="\n\n".join(
-                section
-                for section in (sections.summary, sections.research, sections.impact)
-                if section
-            ),
-            summary_text=sections.summary,
-            research_text=sections.research,
-            impact_text=sections.impact,
-            expires_at=user_analysis_expiry(),
-            features=DocumentFeatures(
-                features_json=json.dumps(features),
-                entities_json=json.dumps(entities),
-            ),
-        )
-        db.add(document)
-        db.flush()
-
-        inference = Inference(
-            document_id=document.document_id,
-            config_id=config_id,
-            score=output.get("score"),
-            true_label=None,
-            prediction_label=output.get("label"),
-            narrative_contribution=output.get("narrative_contribution"),
-            feature_contribution=output.get("feature_contribution"),
-            feature_attributions=json.dumps(feature_attributions),
-        )
-        db.add(inference)
-        db.flush()
-
-        db.add_all(
-            [
-                Attention(
-                    inference_id=inference.inference_id,
-                    sentence_text=sentence,
-                    weight=weight,
-                )
-                for sentence, weight in zip(sentences, attention)
-            ]
-        )
-
-        db.commit()
-        return {
-            "document_id": document.document_id,
-            "inference_id": inference.inference_id,
-            "title": title,
-            "created_at": inference.created_at.isoformat() if inference.created_at else None,
-        }
-
-
-def _normalise_title(value: str | None) -> str:
-    title = (value or "").strip()
-    return title or "Untitled inference"

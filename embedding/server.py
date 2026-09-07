@@ -11,7 +11,7 @@ from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
-MODEL_NAME = os.getenv("EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-4B")
+MODEL_NAME = os.getenv("AQUIFER_EMBEDDING_MODEL", "Qwen/Qwen3-Embedding-4B")
 
 model: SentenceTransformer | None = None
 
@@ -54,7 +54,7 @@ def embed(request: EmbeddingRequest):
     if model is None:
         raise RuntimeError("Model is not loaded yet.")
     
-    bs=int(os.getenv("EMBEDDING_BATCH_SIZE", 8))
+    bs=int(os.getenv("AQUIFER_EMBEDDING_BS", 8))
 
     embeddings = model.encode(request.texts, prompt=request.prompt, batch_size=bs)
 

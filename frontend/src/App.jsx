@@ -9,14 +9,14 @@ import UploadPage from "./pages/UploadPage";
 import NavItem from "./components/ui/NavItem";
 import { getUserErrorMessage } from "./helper/error_messages";
 
-const LLM_TIMEOUT_MS = 305_000;
-
 export default function App() {
   const [currentView, setCurrentView] = useState("upload");
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
   const [uploadInferenceResult, setUploadInferenceResult] = useState(null);
+  const [isInferenceProcessing, setIsInferenceProcessing] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [models, setModels] = useState([]);
   const [isModelsLoading, setIsModelsLoading] = useState(true);
   const [modelsError, setModelsError] = useState("");
@@ -105,11 +105,7 @@ export default function App() {
     if (!inferenceId || !result.llm_input || llmStartedIds.current.has(inferenceId)) return;
 
     const controller = new AbortController();
-    const request = { controller, didTimeout: false, timeoutId: null };
-    request.timeoutId = window.setTimeout(() => {
-      request.didTimeout = true;
-      controller.abort();
-    }, LLM_TIMEOUT_MS);
+    const request = { controller };
     llmStartedIds.current.add(inferenceId);
     llmRequests.current.set(inferenceId, request);
 
@@ -122,17 +118,14 @@ export default function App() {
         });
       })
       .catch((error) => {
-        if (error.name === "AbortError" && !request.didTimeout) return;
+        if (error.name === "AbortError") return;
         updateLlmFeedback(inferenceId, {
           result: null,
           status: "error",
-          errorMessage: request.didTimeout
-            ? "AI insight generation timed out after five minutes."
-            : getUserErrorMessage(error, "AI insights could not be generated. Please try again later."),
+          errorMessage: getUserErrorMessage(error, "AI insights could not be generated. Please try again later."),
         });
       })
       .finally(() => {
-        window.clearTimeout(request.timeoutId);
         if (llmRequests.current.get(inferenceId) === request) {
           llmRequests.current.delete(inferenceId);
         }
@@ -140,8 +133,7 @@ export default function App() {
   }, [updateLlmFeedback]);
 
   useEffect(() => () => {
-    llmRequests.current.forEach(({ controller, timeoutId }) => {
-      window.clearTimeout(timeoutId);
+    llmRequests.current.forEach(({ controller }) => {
       controller.abort();
     });
     llmRequests.current.clear();
@@ -151,6 +143,7 @@ export default function App() {
   const handleAnalysisComplete = useCallback((result) => {
     const sharedResult = {
       ...result,
+      result_type: "mil",
       llm_feedback: result.llm_feedback || (result.llm_input
         ? { result: null, status: "running", errorMessage: "" }
         : { result: null, status: "not_found", errorMessage: "" }),
@@ -174,8 +167,34 @@ export default function App() {
     return sharedResult;
   }, [startLlmFeedback]);
 
+  const handleGemmaComplete = useCallback((result) => {
+    setInferenceHistory((current) => [result, ...current]);
+    setSelectedHistoryId(result.inference_id);
+  }, []);
+
+  const isLlmProcessing = inferenceHistory.some(
+    (result) => result.llm_feedback?.status === "running",
+  );
+  const isProcessing = isInferenceProcessing || isLlmProcessing;
+
+  useEffect(() => {
+    if (!isProcessing) return undefined;
+
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isProcessing]);
+
+  const elapsedTime = `${String(Math.floor(elapsedSeconds / 60)).padStart(2, '0')}:${String(elapsedSeconds % 60).padStart(2, '0')}`;
+
   return (
-    <div className="flex bg-background overflow-hidden h-screen w-full text-foreground">
+    <fieldset
+      disabled={isInferenceProcessing}
+      aria-busy={isProcessing}
+      className="m-0 flex h-screen min-w-0 w-full overflow-hidden border-0 bg-background p-0 text-foreground [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-60 [&_select:disabled]:cursor-not-allowed [&_select:disabled]:opacity-60"
+    >
       <aside className={`bg-sidebar text-sidebar-foreground flex flex-col border-r border-sidebar-border shadow-sm z-10 shrink-0 transition-all duration-300 ease-in-out relative ${isCollapsed ? 'w-20' : 'w-68'}`}>
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)} 
@@ -190,7 +209,11 @@ export default function App() {
             <LayoutDashboard className="h-4 w-4 text-sidebar-foreground/80 shrink-0" />
             {!isCollapsed && <span>REF Analysis</span>}
           </h2>
-          {!isCollapsed && <p className="text-[11px] text-sidebar-foreground/70 mt-1">Impact case evaluation</p>}
+          {isProcessing && (
+            <p className={`mt-2 font-medium tabular-nums text-sidebar-foreground ${isCollapsed ? 'text-center text-xs' : 'text-sm'}`}>
+              {isCollapsed ? elapsedTime : `Running · ${elapsedTime}`}
+            </p>
+          )}
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-3">
@@ -295,6 +318,7 @@ export default function App() {
           <UploadPage 
             inferenceResult={uploadInferenceResult}
             onAnalysisComplete={handleAnalysisComplete}
+            onGemmaComplete={handleGemmaComplete}
             onClearAnalysis={() => setUploadInferenceResult(null)}
             activeConfigId={activeConfigId}
             modelsError={modelsError || (!isModelsLoading && models.length === 0
@@ -303,6 +327,10 @@ export default function App() {
             onRetryModels={fetchModels}
             embeddingModelName={slurmEmbeddingModel}
             llmModelName={slurmLlmModel}
+            onInferenceProcessingChange={(processing) => {
+              if (processing) setElapsedSeconds(0);
+              setIsInferenceProcessing(processing);
+            }}
           />
         )}
         {currentView === "models" && (
@@ -315,6 +343,6 @@ export default function App() {
         )}
         {currentView === "feedback" && <FeedbackPage />}
       </main>
-    </div>
+    </fieldset>
   );
 }

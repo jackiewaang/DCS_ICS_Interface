@@ -2,21 +2,21 @@ import logging
 import time
 from typing import Any
 
-from app.clients.embedding_client import EmbeddingClient
-from app.clients.hybrid_embedding_client import HybridEmbeddingClient
-from app.models.inference import ModelConfig
+from app.clients.aquifer_embedding_client import AquiferEmbeddingClient
+from app.clients.slurm_client import SlurmClient
+from app.models.model_configs import ModelConfig
 from app.pipeline.embedding_preprocessor import EmbeddingPreprocessor
 from app.pipeline.embedding_saver import EmbeddingSaver
 from app.pipeline.feature_vector_builder import FeatureVectorBuilder
 from app.pipeline.model_config_resolver import ModelConfigResolver
 from app.pipeline.model_runner import ModelRunner
 from app.repositories.model_config_repository import get_model_config
+from app.services.embedding_service import EmbeddingService
 
 
 logger = logging.getLogger(__name__)
 
 SAVE_EMBEDDINGS_PICKLE = False
-EMBEDDING_SERVER_URL = "http://localhost:8001"
 CLASSIFICATION_PROMPT = (
     "Given a text from a research impact report, classify the research impact "
     "into high-quality or low-quality: "
@@ -28,7 +28,7 @@ class PipelineManager:
         self,
         model_runner: ModelRunner | None = None,
         embedding_preprocessor: EmbeddingPreprocessor | None = None,
-        embedding_client: EmbeddingClient | None = None,
+        embedding_service: EmbeddingService | None = None,
         model_config_resolver: ModelConfigResolver | None = None,
         feature_vector_builder: FeatureVectorBuilder | None = None,
         embedding_saver: EmbeddingSaver | None = None,
@@ -36,8 +36,9 @@ class PipelineManager:
     ):
         self.model_runner = model_runner or ModelRunner()
         self.embedding_preprocessor = embedding_preprocessor or EmbeddingPreprocessor()
-        self.embedding_client = hybrid_embedding_client or HybridEmbeddingClient(
-            aquifer_client=embedding_client or EmbeddingClient(EMBEDDING_SERVER_URL)
+        self.embedding_service = embedding_service or EmbeddingService(
+            slurm_client=SlurmClient(),
+            aquifer_client=AquiferEmbeddingClient(),
         )
         self.model_config_resolver = model_config_resolver or ModelConfigResolver()
         self.feature_vector_builder = feature_vector_builder or FeatureVectorBuilder()
@@ -112,7 +113,7 @@ class PipelineManager:
             model_config.get("config_id"),
             len(sentences),
         )
-        embeddings = self.embedding_client.embed(
+        embeddings = self.embedding_service.embed(
             texts=sentences,
             prompt=CLASSIFICATION_PROMPT,
             model_name=embedding_model_name,

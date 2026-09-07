@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Loader2, Play, Upload, X } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, FileText, Loader2, Play, Sparkles, Upload, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 function countWords(text) {
@@ -18,12 +18,15 @@ export default function SectionEditor({
   onRemoveFile,
   onExtract,
   onRunInference,
+  onRunGemma,
   onTitleChange,
   onSectionChange,
   onToggleSection,
   isUploading,
   isRunningInference,
+  isRunningGemma,
   canRunInference,
+  canRunGemma,
   error,
   inferenceError,
   hasDraft,
@@ -122,15 +125,29 @@ export default function SectionEditor({
                   />
                 </div>
 
-                <Button
-                  type="button"
-                  onClick={onRunInference}
-                  disabled={!canRunInference}
-                  className="cursor-pointer h-10 shrink-0 gap-2"
-                >
-                  {isRunningInference ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  Run Inference
-                </Button>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={onRunInference}
+                    disabled={!canRunInference}
+                    className="cursor-pointer h-10 gap-2"
+                  >
+                    {isRunningInference ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    Run Inference
+                  </Button>
+                  {onRunGemma && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={onRunGemma}
+                      disabled={!canRunGemma}
+                      className="cursor-pointer h-10 gap-2"
+                    >
+                      {isRunningGemma ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                      Run Gemma
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {inferenceError && (
