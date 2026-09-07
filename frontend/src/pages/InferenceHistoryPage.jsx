@@ -1,5 +1,6 @@
 import { AlertCircle, CheckCircle2, Clock3, History, Loader2 } from 'lucide-react';
 import InferenceResults from '@/components/InferenceResults';
+import GemmaResults from '@/components/GemmaResults';
 
 function formatDate(value) {
   if (!value) return 'This session';
@@ -97,8 +98,10 @@ export default function InferenceHistoryPage({ history, selectedId, onSelect }) 
           </div>
         </aside>
 
-        <div className="min-h-0">
-          <InferenceResults data={selectedResult} />
+        <div className="min-h-0 overflow-y-auto">
+          {selectedResult?.result_type === 'gemma'
+            ? <GemmaResults data={selectedResult} />
+            : <InferenceResults data={selectedResult} />}
         </div>
       </div>
     </div>

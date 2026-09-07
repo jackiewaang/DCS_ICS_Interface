@@ -143,6 +143,7 @@ export default function App() {
   const handleAnalysisComplete = useCallback((result) => {
     const sharedResult = {
       ...result,
+      result_type: "mil",
       llm_feedback: result.llm_feedback || (result.llm_input
         ? { result: null, status: "running", errorMessage: "" }
         : { result: null, status: "not_found", errorMessage: "" }),
@@ -166,6 +167,11 @@ export default function App() {
     return sharedResult;
   }, [startLlmFeedback]);
 
+  const handleGemmaComplete = useCallback((result) => {
+    setInferenceHistory((current) => [result, ...current]);
+    setSelectedHistoryId(result.inference_id);
+  }, []);
+
   const isLlmProcessing = inferenceHistory.some(
     (result) => result.llm_feedback?.status === "running",
   );
@@ -185,7 +191,7 @@ export default function App() {
 
   return (
     <fieldset
-      disabled={isProcessing}
+      disabled={isInferenceProcessing}
       aria-busy={isProcessing}
       className="m-0 flex h-screen min-w-0 w-full overflow-hidden border-0 bg-background p-0 text-foreground [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-60 [&_select:disabled]:cursor-not-allowed [&_select:disabled]:opacity-60"
     >
@@ -203,9 +209,9 @@ export default function App() {
             <LayoutDashboard className="h-4 w-4 text-sidebar-foreground/80 shrink-0" />
             {!isCollapsed && <span>REF Analysis</span>}
           </h2>
-          {!isCollapsed && isProcessing && (
-            <p className="mt-1 text-[11px] tabular-nums text-sidebar-foreground/70">
-              Running · {elapsedTime}
+          {isProcessing && (
+            <p className={`mt-2 font-medium tabular-nums text-sidebar-foreground ${isCollapsed ? 'text-center text-xs' : 'text-sm'}`}>
+              {isCollapsed ? elapsedTime : `Running · ${elapsedTime}`}
             </p>
           )}
         </div>
@@ -312,6 +318,7 @@ export default function App() {
           <UploadPage 
             inferenceResult={uploadInferenceResult}
             onAnalysisComplete={handleAnalysisComplete}
+            onGemmaComplete={handleGemmaComplete}
             onClearAnalysis={() => setUploadInferenceResult(null)}
             activeConfigId={activeConfigId}
             modelsError={modelsError || (!isModelsLoading && models.length === 0

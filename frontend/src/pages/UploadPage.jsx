@@ -57,6 +57,7 @@ export default function UploadPage({
   activeConfigId,
   inferenceResult,
   onAnalysisComplete,
+  onGemmaComplete,
   onClearAnalysis,
   modelsError,
   onRetryModels,
@@ -194,8 +195,19 @@ export default function UploadPage({
     onClearAnalysis?.();
 
     try {
+      const startedAt = performance.now();
       const result = await api.runGemmaInference(draft.sections, draft.title);
-      setGemmaResult(result);
+      const gemmaResultWithMetadata = {
+        ...result,
+        result_type: 'gemma',
+        inference_id: `gemma-${globalThis.crypto?.randomUUID?.() || Date.now()}`,
+        created_at: new Date().toISOString(),
+        title: draft.title || file?.name || 'Untitled inference',
+        inference_time_ms: Math.round(performance.now() - startedAt),
+        sections: { ...draft.sections },
+      };
+      setGemmaResult(gemmaResultWithMetadata);
+      onGemmaComplete?.(gemmaResultWithMetadata);
       setCollapsedSections(COLLAPSED_SECTIONS);
     } catch (err) {
       console.error('Gemma Inference Error:', err);
