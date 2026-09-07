@@ -32,7 +32,6 @@ class PipelineManager:
         model_config_resolver: ModelConfigResolver | None = None,
         feature_vector_builder: FeatureVectorBuilder | None = None,
         embedding_saver: EmbeddingSaver | None = None,
-        hybrid_embedding_client: HybridEmbeddingClient | None = None,
     ):
         self.model_runner = model_runner or ModelRunner()
         self.embedding_preprocessor = embedding_preprocessor or EmbeddingPreprocessor()
