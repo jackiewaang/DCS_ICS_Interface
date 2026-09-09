@@ -131,10 +131,9 @@ class SlurmBackend:
             )
             return result
         
-        #finally:
-        #   self._cleanup(remote_dir)
         finally:
-            pass
+          self._cleanup(remote_dir)
+          
     def _submit_job(self, script: str, remote_dir: str) -> str:
         """
         Submits job to Slurm and returns job ID
@@ -142,6 +141,8 @@ class SlurmBackend:
 
         command = (
             f"sbatch --parsable "
+            f"--output={shlex.quote(f'{remote_dir}/joboutput_%j.out')} "
+            f"--error={shlex.quote(f'{remote_dir}/joboutput_%j.err')} "
             f"{shlex.quote(script)} "
             f"{shlex.quote(remote_dir)} "
             f"{shlex.quote(self.config.remote_repo_dir)}"
