@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from uuid import uuid4
 
 from .config import SlurmConfig
+from .models import ada_models, gecko_models, gemma_partitions
 
 logger = logging.getLogger(__name__)
 
@@ -43,19 +44,57 @@ class SlurmBackend:
 
     # Wrapper on submit_job to run LLM jobs
     def run_llm(self, payload: dict, model_name: str):
-        return self._run_job(
+        partitions = []
+        if model_name in ada_models:
+            partitions.append("wmlg-ada")
+        if model_name in gecko_models:
+            partitions.append("gecko")
+        if not partitions:
+            raise ValueError(f"Unsupported Slurm LLM model: {model_name}")
+
+        return self._run_partitioned_job(
             script=self.config.llm_script,
             payload={**payload, "model_name": model_name},
+            model_name=model_name,
+            partitions=partitions,
         )
 
     def run_gemma(self, payload: dict):
-        return self._run_job(
+        return self._run_partitioned_job(
             script=self.config.gemma_script,
             payload=payload,
+            model_name="Gemma 3 12B fine-tuned",
+            partitions=gemma_partitions,
         )
 
+    def _run_partitioned_job(
+        self, script: str, payload: dict, model_name: str, partitions: list[str],
+    ):
+        if not partitions:
+            raise ValueError(f"No Slurm partitions configured for model: {model_name}")
+
+        for index, partition in enumerate(partitions):
+            logger.info("Slurm LLM attempt model=%s partition=%s", model_name, partition)
+            try:
+                # Each attempt gets its own request directory and timeout.
+                return self._run_job(
+                    script=script,
+                    payload=payload,
+                    partition=partition,
+                )
+            except SlurmAllocationTimeout as exc:
+                if index == len(partitions) - 1:
+                    raise SlurmAllocationTimeout(
+                        f"Model {model_name} was not allocated on any eligible "
+                        f"partition: {', '.join(partitions)}."
+                    ) from exc
+                logger.warning(
+                    "Slurm LLM allocation timed out model=%s partition=%s fallback=%s",
+                    model_name, partition, partitions[index + 1],
+                )
+
     # Main function running full lifecycle of a job
-    def _run_job(self, script: str, payload: dict):
+    def _run_job(self, script: str, payload: dict, partition: str | None = None):
 
         request_id = str(uuid4())
         remote_dir = f"{self.config.remote_job_dir.rstrip('/')}/{request_id}"
@@ -73,12 +112,14 @@ class SlurmBackend:
 
             job_id = self._submit_job(
                 script=script,
-                remote_dir=remote_dir
+                remote_dir=remote_dir,
+                partition=partition,
             )
             logger.info(
-                "Slurm job submitted request_id=%s job_id=%s elapsed_seconds=%.2f",
+                "Slurm job submitted request_id=%s job_id=%s partition=%s elapsed_seconds=%.2f",
                 request_id,
                 job_id,
+                partition,
                 time.monotonic() - started_at,
             )
 
@@ -132,15 +173,17 @@ class SlurmBackend:
             return result
         
         finally:
-          self._cleanup(remote_dir)
+            self._cleanup(remote_dir)
           
-    def _submit_job(self, script: str, remote_dir: str) -> str:
+    def _submit_job(self, script: str, remote_dir: str, partition: str | None = None) -> str:
         """
         Submits job to Slurm and returns job ID
         """
 
+        partition_option = f"--partition={shlex.quote(partition)} " if partition else ""
         command = (
             f"sbatch --parsable "
+            f"{partition_option}"
             f"--output={shlex.quote(f'{remote_dir}/joboutput_%j.out')} "
             f"--error={shlex.quote(f'{remote_dir}/joboutput_%j.err')} "
             f"{shlex.quote(script)} "
@@ -172,7 +215,7 @@ class SlurmBackend:
 
     def _wait_for_allocation(self, job_id: str) -> bool:
         """
-        Polls job state until allocated or timeout fails
+        Returns False only on allocation timeout; terminal failures raise.
         """
         
         deadline = time.monotonic() + self.config.allocation_timeout
@@ -194,7 +237,7 @@ class SlurmBackend:
                 "NODE_FAIL",
                 "OUT_OF_MEMORY"
             }:
-                return False
+                raise RuntimeError(f"Slurm job {job_id} failed with state: {state}")
 
             time.sleep(self.config.poll_interval)
         

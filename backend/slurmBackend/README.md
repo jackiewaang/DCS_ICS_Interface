@@ -12,7 +12,26 @@ This directory contains the active SSH-to-Slurm transport and three remote GPU w
 - `SLURM_EMBEDDING_SCRIPT`, `SLURM_LLM_SCRIPT`, and `SLURM_GEMMA_SCRIPT` for batch script paths.
 - `SLURM_POLL_INTERVAL`, `SLURM_ALLOCATION_TIMEOUT`, and `SLURM_COMPLETION_TIMEOUT` for job monitoring.
 
-The selectable remote model identifiers are the literal allowlists in [`models.py`](models.py).
+The selectable remote models are defined in [`models.py`](models.py). For LLMs,
+add model IDs to `ada_models` (partition `wmlg-ada`), `gecko_models`, or both.
+`SLURM_LLM_MODELS` is their deduplicated union. Models in both lists try
+`wmlg-ada` first, then `gecko` only if allocation times out. Models in one list
+only use that partition; unknown models are rejected before submission.
+
+Each attempt gets the full `SLURM_ALLOCATION_TIMEOUT` and its own directory.
+The timed-out job is cancelled before fallback; cancellation failures stop the
+request. Submission errors, terminal job failures, and completion timeouts do
+not trigger partition fallback. Exhausting eligible partitions raises
+`SlurmAllocationTimeout`. Existing application-level fallbacks still apply.
+Partition selection overrides the LLM script's default via `sbatch --partition`;
+resources and environment remain the same. Embedding jobs continue using their
+script defaults.
+
+The separate fine-tuned Gemma pipeline uses `gemma_partitions` in `models.py`,
+defaulting to `["wmlg-ada", "gecko"]`, with the same timeout and cancellation
+rules. Remove `"gecko"` to make Gemma ada-only. It still uses `run_gemma.sbatch`
+and its dedicated prompts and adapter; it is not added to `SLURM_LLM_MODELS`
+or the MIL feedback pipeline.
 
 ## Workers
 
@@ -22,4 +41,7 @@ The selectable remote model identifiers are the literal allowlists in [`models.p
 
 Embedding and AI-insight callers provide an Aquifer fallback in `backend/app/services/`. Gemma does not have a fallback. The Gemma worker loads one model and performs two generations: a GPA followed by diagnostic comments.
 
-Remote request cleanup is implemented in `_cleanup()` but its call is currently disabled, so request directories remain under `SLURM_REMOTE_JOB_DIR`.
+Remote request directories are removed by `_cleanup()` after each attempt.
+
+Run the mocked partition tests from the repository root:
+`python -m unittest backend.slurmBackend.test_partition_routing`.
